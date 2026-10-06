@@ -23,6 +23,7 @@ from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_capnp
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
+from openpilot.sunnypilot.selfdrive.car.daily_distance import DailyDistance
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 
 REPLAY = "REPLAY" in os.environ
@@ -84,6 +85,7 @@ class Car:
     self.last_actuators_output = structs.CarControl.Actuators()
 
     self.params = Params()
+    self.daily_distance = DailyDistance(self.params)
 
     self.can_callbacks = can_comm_callbacks(self.can_sock, self.pm.sock['sendcan'])
 
@@ -197,6 +199,8 @@ class Car:
 
     # Update carState from CAN
     CS, CS_SP = self.CI.update(can_list)
+    if (today_item := self.daily_distance.update(CS_SP.carData)) is not None:
+      CS_SP.carData.append(today_item)
     CS_SP = convert_to_capnp(CS_SP)
 
     # Update radar tracks from CAN

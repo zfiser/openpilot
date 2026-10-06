@@ -28,16 +28,18 @@ from openpilot.common.prefix import OpenpilotPrefix
 # name -> (lead car, planner stop, openpilot state enabled, car data items as (key, label, value, unit, valid))
 SCENARIOS = {
   rl.KeyboardKey.KEY_ONE: ("engaged, no lead", False, False, True, [("odometer", "Odometer", 54321.0, "km", True),
+                                                                       ("today", "Today", 42.0, "km", True),
                                                                        ("rpm", "Engine RPM", 1800.0, "rpm", True)]),
   rl.KeyboardKey.KEY_TWO: ("lead car", True, False, True, [("odometer", "Odometer", 54321.0, "km", True),
+                                                           ("today", "Today", 42.0, "km", True),
                                                            ("rpm", "Engine RPM", 1800.0, "rpm", True)]),
   rl.KeyboardKey.KEY_THREE: ("stop light, engine off", False, True, True, [("odometer", "Odometer", 54321.0, "km", True),
                                                                            ("rpm", "Engine RPM", 0.0, "rpm", True)]),
   rl.KeyboardKey.KEY_FOUR: ("disengaged, car data missing", False, False, False, [("odometer", "Odometer", 0.0, "km", False),
                                                                                  ("rpm", "Engine RPM", 0.0, "rpm", False)]),
   rl.KeyboardKey.KEY_FIVE: ("many items", True, False, True, [
-    ("odometer", "Odometer", 54321.0, "km", True), ("rpm", "Engine RPM", 1800.0, "rpm", True),
-    ("tire_temp_fl", "Tire FL temp", 32.0, "C", True), ("tire_temp_fr", "Tire FR temp", 33.5, "C", True),
+    ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True),
+    ("rpm", "Engine RPM", 1800.0, "rpm", True), ("tire_temp_fl", "Tire FL temp", 32.0, "C", True), ("tire_temp_fr", "Tire FR temp", 33.5, "C", True),
     ("battery", "12V battery", 13.84, "V", True), ("hv", "Hybrid battery", 62.0, "%", True)]),
 }
 
