@@ -158,7 +158,7 @@ def main() -> None:
       gui_app.close()
       return
 
-    scenario = SCENARIOS[rl.KeyboardKey.KEY_ONE]
+    scenario = SCENARIOS[rl.KeyboardKey.KEY_TWO]  # starts with a lead car so the distance in the bottom corner shows
     print("scenarios:", ", ".join(f"{i}={v[0]}" for i, v in enumerate(SCENARIOS.values(), 1)))
 
     start = time.monotonic()
