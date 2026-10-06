@@ -27,10 +27,14 @@ from openpilot.common.prefix import OpenpilotPrefix
 
 # name -> (lead car, planner stop, openpilot state enabled, car data items as (key, label, value, unit, valid))
 SCENARIOS = {
-  rl.KeyboardKey.KEY_ONE: ("engaged, no lead", False, False, True, [("odometer", "Odometer", 54321.0, "km", True)]),
-  rl.KeyboardKey.KEY_TWO: ("lead car", True, False, True, [("odometer", "Odometer", 54321.0, "km", True)]),
-  rl.KeyboardKey.KEY_THREE: ("stop light", False, True, True, [("odometer", "Odometer", 54321.0, "km", True)]),
-  rl.KeyboardKey.KEY_FOUR: ("disengaged, odometer missing", False, False, False, [("odometer", "Odometer", 0.0, "km", False)]),
+  rl.KeyboardKey.KEY_ONE: ("engaged, no lead", False, False, True, [("odometer", "Odometer", 54321.0, "km", True),
+                                                                       ("rpm", "Engine RPM", 1800.0, "rpm", True)]),
+  rl.KeyboardKey.KEY_TWO: ("lead car", True, False, True, [("odometer", "Odometer", 54321.0, "km", True),
+                                                           ("rpm", "Engine RPM", 1800.0, "rpm", True)]),
+  rl.KeyboardKey.KEY_THREE: ("stop light, engine off", False, True, True, [("odometer", "Odometer", 54321.0, "km", True),
+                                                                           ("rpm", "Engine RPM", 0.0, "rpm", True)]),
+  rl.KeyboardKey.KEY_FOUR: ("disengaged, car data missing", False, False, False, [("odometer", "Odometer", 0.0, "km", False),
+                                                                                 ("rpm", "Engine RPM", 0.0, "rpm", False)]),
   rl.KeyboardKey.KEY_FIVE: ("many items", True, False, True, [
     ("odometer", "Odometer", 54321.0, "km", True), ("rpm", "Engine RPM", 1800.0, "rpm", True),
     ("tire_temp_fl", "Tire FL temp", 32.0, "C", True), ("tire_temp_fr", "Tire FR temp", 33.5, "C", True),
@@ -41,6 +45,8 @@ SCENARIOS = {
 def animate_item(item, t: float):
   """Make the fake car data move a little so the page looks alive, odometer counts up, the rest wobbles."""
   key, label, value, unit, valid = item
+  if key == "rpm" and value == 0.0:
+    return item  # engine off stays off
   wobble = {"odometer": 0.0, "battery": 0.25 * math.sin(t * 1.3), "rpm": 600.0 * math.sin(t * 0.8),
             "tire_temp_fl": 1.5 * math.sin(t * 0.3), "tire_temp_fr": 1.5 * math.sin(t * 0.35),
             "hv": 3.0 * math.sin(t * 0.2)}.get(key, 0.0)
