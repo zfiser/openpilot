@@ -9,7 +9,8 @@ Open the mici UI in a window on a PC with fake onroad data, to look at the sideb
 
   python selfdrive/ui/sunnypilot/tests/ui_preview.py
 
-Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario, M switches between metric and imperial units (--metric starts in metric).
+Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario, M switches between metric and imperial units (--metric starts in metric),
+N cycles the network between WiFi, LTE and offline (tapping the network icon on the home screen only does something when not on WiFi).
 The values animate (lead distance, confidence, steering, driver head, car data).
 Add --shots DIR to render every scenario headless and save PNGs of the road view and the car data page.
 """
@@ -45,7 +46,11 @@ def animate_item(item, t: float):
   return key, label, value + wobble + (t * 0.01 if key == "odometer" else 0.0), unit, valid
 
 
-def send_state(pm: PubMaster, scenario, t: float | None = None) -> None:
+NETWORKS = [("wifi", log.DeviceState.NetworkType.wifi), ("LTE", log.DeviceState.NetworkType.cell4G),
+            ("offline", log.DeviceState.NetworkType.none)]
+
+
+def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log.DeviceState.NetworkType.wifi) -> None:
   """t is seconds since start for animated values, None gives fixed values (used for the screenshots)."""
   _, lead, stop, enabled, items = scenario
   moving = enabled and not stop
@@ -59,7 +64,8 @@ def send_state(pm: PubMaster, scenario, t: float | None = None) -> None:
 
   ds = messaging.new_message('deviceState')
   ds.deviceState.started = True
-  ds.deviceState.networkType = log.DeviceState.NetworkType.wifi
+  ds.deviceState.networkType = network_type
+  ds.deviceState.networkStrength = log.DeviceState.NetworkStrength.good
   ps = messaging.new_message('pandaStates', 1)
   ps.pandaStates[0].pandaType = log.PandaState.PandaType.dos
   ps.pandaStates[0].ignitionLine = True
@@ -181,6 +187,7 @@ def main() -> None:
     print("scenarios:", ", ".join(f"{i}={v[0]}" for i, v in enumerate(SCENARIOS.values(), 1)))
 
     start = time.monotonic()
+    network_idx = 0
     for _ in gui_app.render():
       for key, value in SCENARIOS.items():
         if rl.is_key_pressed(key):
@@ -189,7 +196,10 @@ def main() -> None:
       if rl.is_key_pressed(rl.KeyboardKey.KEY_M):
         set_metric(not ui_state.is_metric)
         print("metric:", ui_state.is_metric)
-      send_state(pm, scenario, time.monotonic() - start)
+      if rl.is_key_pressed(rl.KeyboardKey.KEY_N):
+        network_idx = (network_idx + 1) % len(NETWORKS)
+        print("network:", NETWORKS[network_idx][0])
+      send_state(pm, scenario, time.monotonic() - start, NETWORKS[network_idx][1])
       ui_state.update()
 
 
