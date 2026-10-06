@@ -54,6 +54,7 @@ def send_state(pm: PubMaster, scenario) -> None:
 
   rs = messaging.new_message('radarState')
   rs.radarState.leadOne.present = lead
+  rs.radarState.leadOne.dRel = 32.4
   pm.send('radarState', rs)
 
   lp = messaging.new_message('longitudinalPlan')

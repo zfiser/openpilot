@@ -41,7 +41,7 @@ def _load_sidebar():
     LAT_ONLY = "lat_only"
     LONG_ONLY = "long_only"
 
-  ui_state = _Obj(status=UIStatus.DISENGAGED, started_frame=0, sm=None)
+  ui_state = _Obj(status=UIStatus.DISENGAGED, started_frame=0, sm=None, is_metric=True)
   stubs = {
     "pyray": mock.MagicMock(),
     "openpilot": _stub_module("openpilot"),
@@ -54,7 +54,12 @@ def _load_sidebar():
     "openpilot.selfdrive.ui.ui_state": _stub_module("openpilot.selfdrive.ui.ui_state", ui_state=ui_state, UIStatus=UIStatus),
     "openpilot.system": _stub_module("openpilot.system"),
     "openpilot.system.ui": _stub_module("openpilot.system.ui"),
+    "openpilot.system.ui.lib": _stub_module("openpilot.system.ui.lib"),
+    "openpilot.system.ui.lib.application": _stub_module(
+      "openpilot.system.ui.lib.application", FontWeight=mock.MagicMock(), TextAlignment=mock.MagicMock(),
+      TextAlignmentVertical=mock.MagicMock()),
     "openpilot.system.ui.widgets": _stub_module("openpilot.system.ui.widgets", Widget=_Widget),
+    "openpilot.system.ui.widgets.label": _stub_module("openpilot.system.ui.widgets.label", UnifiedLabel=mock.MagicMock()),
   }
   with mock.patch.dict(sys.modules, stubs):
     spec = importlib.util.spec_from_file_location("sidebar_widgets_under_test", SIDEBAR_PATH)
@@ -64,9 +69,9 @@ def _load_sidebar():
 
 
 class _SM(dict):
-  def __init__(self, lead_present: bool, should_stop: bool, plan_frame: int = 1):
+  def __init__(self, lead_present: bool, should_stop: bool, plan_frame: int = 1, d_rel: float = 25.0):
     super().__init__({
-      "radarState": _Obj(leadOne=_Obj(present=lead_present)),
+      "radarState": _Obj(leadOne=_Obj(present=lead_present, dRel=d_rel)),
       "longitudinalPlan": _Obj(shouldStop=should_stop),
     })
     self.recv_frame = {"longitudinalPlan": plan_frame}
@@ -103,6 +108,23 @@ class TestSidebarWidgets(unittest.TestCase):
   def test_missing_messages_do_not_raise(self):
     self.ui_state.sm = _Obj(recv_frame={})
     assert self.sidebar._indicator_reason() == "chill"
+
+  def test_lead_distance_parts(self):
+    assert self.mod.lead_distance_parts(32.4, True) == ("32", "m")
+    assert self.mod.lead_distance_parts(32.6, True) == ("33", "m")
+    assert self.mod.lead_distance_parts(30.0, False) == ("98", "ft")
+
+  def test_lead_distance_with_lead(self):
+    self.ui_state.sm = _SM(lead_present=True, should_stop=False, d_rel=41.7)
+    assert abs(self.sidebar._lead_distance() - 41.7) < 1e-6
+
+  def test_lead_distance_without_lead(self):
+    self.ui_state.sm = _SM(lead_present=False, should_stop=False, d_rel=41.7)
+    assert self.sidebar._lead_distance() is None
+
+  def test_lead_distance_missing_message(self):
+    self.ui_state.sm = _Obj(recv_frame={})
+    assert self.sidebar._lead_distance() is None
 
 
 if __name__ == "__main__":
