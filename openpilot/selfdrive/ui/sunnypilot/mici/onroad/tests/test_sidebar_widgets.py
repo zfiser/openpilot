@@ -82,9 +82,9 @@ class TestSidebarWidgets(unittest.TestCase):
     self.mod, self.ui_state, self.UIStatus = _load_sidebar()
     self.sidebar = self.mod.MiciSidebarWidgets(confidence_ball=None)
 
-  def test_chill_by_default(self):
+  def test_no_icon_by_default(self):
     self.ui_state.sm = _SM(lead_present=False, should_stop=False)
-    assert self.sidebar._indicator_reason() == "chill"
+    assert self.sidebar._indicator_reason() == "none"
 
   def test_lead(self):
     self.ui_state.sm = _SM(lead_present=True, should_stop=False)
@@ -103,11 +103,11 @@ class TestSidebarWidgets(unittest.TestCase):
     # longitudinalPlan not received since the drive started
     self.ui_state.started_frame = 10
     self.ui_state.sm = _SM(lead_present=False, should_stop=True, plan_frame=5)
-    assert self.sidebar._indicator_reason() == "chill"
+    assert self.sidebar._indicator_reason() == "none"
 
   def test_missing_messages_do_not_raise(self):
     self.ui_state.sm = _Obj(recv_frame={})
-    assert self.sidebar._indicator_reason() == "chill"
+    assert self.sidebar._indicator_reason() == "none"
 
   def test_lead_distance_parts(self):
     assert self.mod.lead_distance_parts(32.4, True) == ("32", "m")

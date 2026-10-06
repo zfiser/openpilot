@@ -14,7 +14,6 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 
 WHITE = rl.Color(255, 255, 255, 255)
 BLACK = rl.Color(0, 0, 0, 255)
-BLUE = rl.Color(112, 192, 216, 255)
 TRAFFIC_RED = rl.Color(200, 32, 48, 255)
 WHITE_DIM = rl.Color(255, 255, 255, 150)
 M_TO_FT = 3.28084
@@ -42,7 +41,7 @@ def _draw_quad_outline(points: tuple[tuple[float, float], ...], thickness: float
 
 
 class MiciSidebarWidgets(Widget):
-  """Static confidence circle on top, lead car / stop light in the middle, distance to the lead car at the bottom."""
+  """Static confidence circle on top, single car when there is a lead / stop light in the middle, distance to the lead car at the bottom."""
 
   def __init__(self, confidence_ball: ConfidenceBall):
     super().__init__()
@@ -98,7 +97,7 @@ class MiciSidebarWidgets(Widget):
         return "stop"
     except Exception:
       pass
-    return "chill"
+    return "none"
 
   def _draw_indicator(self, rect: rl.Rectangle) -> None:
     reason = self._indicator_reason()
@@ -106,32 +105,9 @@ class MiciSidebarWidgets(Widget):
       self._draw_lead_icon(rect)
     elif reason == "stop":
       self._draw_stop_light_icon(rect)
-    else:
-      self._draw_chill_icon(rect)
-
-  def _draw_chill_icon(self, rect: rl.Rectangle) -> None:
-    cx = rect.x + rect.width / 2
-    cy = rect.y + rect.height / 2
-    stroke = 3
-
-    _draw_line(cx - 14, cy - 15, cx + 14, cy - 15, stroke, WHITE)
-    _draw_line(cx - 16, cy - 13, cx - 16, cy + 1, stroke, WHITE)
-    _draw_line(cx + 16, cy - 13, cx + 16, cy + 1, stroke, WHITE)
-    _draw_line(cx - 19, cy + 3, cx + 19, cy + 3, stroke, WHITE)
-    _draw_line(cx - 21, cy - 3, cx - 21, cy + 10, stroke, WHITE)
-    _draw_line(cx + 21, cy - 3, cx + 21, cy + 10, stroke, WHITE)
-    _draw_line(cx - 21, cy + 10, cx + 21, cy + 10, stroke, WHITE)
-    _draw_line(cx - 14, cy + 6, cx + 14, cy + 6, 2, BLUE)
-    _draw_line(cx - 14, cy + 12, cx - 17, cy + 19, stroke, WHITE)
-    _draw_line(cx + 14, cy + 12, cx + 17, cy + 19, stroke, WHITE)
 
   def _draw_lead_icon(self, rect: rl.Rectangle) -> None:
-    cx = rect.x + rect.width / 2
-    cy = rect.y + rect.height / 2
-    self._draw_car(cx, cy - 13, 31, 18, WHITE, TRAFFIC_RED)
-    self._draw_car(cx, cy + 12, 43, 22, WHITE, TRAFFIC_RED)
-    _draw_line(cx - 11, cy - 1, cx - 11, cy + 3, 2, rl.Color(255, 255, 255, 130))
-    _draw_line(cx + 11, cy - 1, cx + 11, cy + 3, 2, rl.Color(255, 255, 255, 130))
+    self._draw_car(rect.x + rect.width / 2, rect.y + rect.height / 2, 46, 24, WHITE, TRAFFIC_RED)
 
   @staticmethod
   def _draw_car(cx: float, cy: float, width: float, height: float, color: rl.Color, accent: rl.Color) -> None:
