@@ -9,11 +9,13 @@ Open the mici UI in a window on a PC with fake onroad data, to look at the sideb
 
   python selfdrive/ui/sunnypilot/tests/ui_preview.py
 
-Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario.
+Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario. The values animate (lead distance, confidence, steering, car data).
 Add --shots DIR to render every scenario headless and save PNGs of the road view and the car data page.
 """
 import argparse
+import math
 import os
+import time
 
 import pyray as rl
 
@@ -34,8 +36,23 @@ SCENARIOS = {
 }
 
 
-def send_state(pm: PubMaster, scenario) -> None:
+def animate_item(item, t: float):
+  """Make the fake car data move a little so the page looks alive, odometer counts up, the rest wobbles."""
+  key, label, value, unit, valid = item
+  wobble = {"odometer": 0.0, "battery": 0.25 * math.sin(t * 1.3), "tire_fl": 0.4 * math.sin(t * 0.7),
+            "tire_fr": 0.4 * math.sin(t * 0.9), "hv": 3.0 * math.sin(t * 0.2), "temp": 0.5 * math.sin(t * 0.1)}.get(key, 0.0)
+  return key, label, value + wobble + (t * 0.01 if key == "odometer" else 0.0), unit, valid
+
+
+def send_state(pm: PubMaster, scenario, t: float | None = None) -> None:
+  """t is seconds since start for animated values, None gives fixed values (used for the screenshots)."""
   _, lead, stop, enabled, items = scenario
+  moving = enabled and not stop
+  if t is not None:
+    items = [animate_item(item, t) for item in items]
+  lead_distance = 32.4 if t is None else 32.0 + 18.0 * math.sin(t * 0.5)
+  confidence = 0.9 if t is None else 0.5 + 0.5 * math.sin(t * 0.3)  # sweeps the circle from green over orange to red
+  steering_angle = 0.0 if t is None else 25.0 * math.sin(t * 0.4)
 
   ds = messaging.new_message('deviceState')
   ds.deviceState.started = True
@@ -54,8 +71,22 @@ def send_state(pm: PubMaster, scenario) -> None:
 
   rs = messaging.new_message('radarState')
   rs.radarState.leadOne.present = lead
-  rs.radarState.leadOne.dRel = 32.4
+  rs.radarState.leadOne.dRel = lead_distance
   pm.send('radarState', rs)
+
+  car = messaging.new_message('carState')
+  car.carState.vEgo = 20.0 if moving else 0.0
+  car.carState.standstill = not moving
+  car.carState.steeringAngleDeg = steering_angle
+  car.carState.cruiseState.available = True
+  car.carState.cruiseState.enabled = enabled
+  car.carState.cruiseState.speed = 27.0
+  pm.send('carState', car)
+
+  mv = messaging.new_message('modelV2')
+  mv.modelV2.meta.disengagePredictions.brakeDisengageProbs = [1.0 - confidence]
+  mv.modelV2.meta.disengagePredictions.steerOverrideProbs = [0.0]
+  pm.send('modelV2', mv)
 
   lp = messaging.new_message('longitudinalPlan')
   lp.longitudinalPlan.shouldStop = stop
@@ -120,7 +151,7 @@ def main() -> None:
     layout = MiciMainLayout()
     device.set_override_interactive_timeout(99999)
 
-    pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP"])
+    pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2"])
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)
@@ -130,12 +161,13 @@ def main() -> None:
     scenario = SCENARIOS[rl.KeyboardKey.KEY_ONE]
     print("scenarios:", ", ".join(f"{i}={v[0]}" for i, v in enumerate(SCENARIOS.values(), 1)))
 
+    start = time.monotonic()
     for _ in gui_app.render():
       for key, value in SCENARIOS.items():
         if rl.is_key_pressed(key):
           scenario = value
           print("scenario:", value[0])
-      send_state(pm, scenario)
+      send_state(pm, scenario, time.monotonic() - start)
       ui_state.update()
 
 
