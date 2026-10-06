@@ -39,7 +39,7 @@ SCENARIOS = {
                                                                                  ("rpm", "Engine RPM", 0.0, "rpm", False)]),
   rl.KeyboardKey.KEY_FIVE: ("many items", True, False, True, [
     ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True),
-    ("rpm", "Engine RPM", 1800.0, "rpm", True), ("tire_temp_fl", "Tire FL temp", 32.0, "C", True), ("tire_temp_fr", "Tire FR temp", 33.5, "C", True),
+    ("rpm", "Engine RPM", 1800.0, "rpm", True),
     ("battery", "12V battery", 13.84, "V", True), ("hv", "Hybrid battery", 62.0, "%", True)]),
 }
 
@@ -50,7 +50,6 @@ def animate_item(item, t: float):
   if key == "rpm" and value == 0.0:
     return item  # engine off stays off
   wobble = {"odometer": 0.0, "battery": 0.25 * math.sin(t * 1.3), "rpm": 600.0 * math.sin(t * 0.8),
-            "tire_temp_fl": 1.5 * math.sin(t * 0.3), "tire_temp_fr": 1.5 * math.sin(t * 0.35),
             "hv": 3.0 * math.sin(t * 0.2)}.get(key, 0.0)
   return key, label, value + wobble + (t * 0.01 if key == "odometer" else 0.0), unit, valid
 
