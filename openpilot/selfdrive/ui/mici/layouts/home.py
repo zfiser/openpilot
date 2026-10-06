@@ -80,6 +80,7 @@ class NetworkIcon(Widget):
     self.set_rect(rl.Rectangle(0, 0, 54, 44))  # max size of all icons
     self._net_type = NetworkType.none
     self._net_strength = 0
+    self._pulsing = False
 
     self._wifi_slash_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_slash.png", 50, 44)
     self._wifi_none_txt = gui_app.texture("icons_mici/settings/network/wifi_strength_none.png", 50, 37)
@@ -92,6 +93,10 @@ class NetworkIcon(Widget):
     self._cell_medium_txt = gui_app.texture("icons_mici/settings/network/cell_strength_medium.png", 54, 36)
     self._cell_high_txt = gui_app.texture("icons_mici/settings/network/cell_strength_high.png", 54, 36)
     self._cell_full_txt = gui_app.texture("icons_mici/settings/network/cell_strength_full.png", 54, 36)
+
+  def set_pulsing(self, pulsing: bool):
+    """Blink the icon, used while a connection attempt is running."""
+    self._pulsing = pulsing
 
   def _update_state(self):
     device_state = ui_state.sm['deviceState']
@@ -123,7 +128,8 @@ class NetworkIcon(Widget):
       # Offset by difference in height between slashless and slash icons to make center align match
       draw_y -= (self._wifi_slash_txt.height - self._wifi_none_txt.height) / 2
 
-    rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, rl.Color(255, 255, 255, int(255 * 0.9)))
+    opacity = 0.9 if not self._pulsing else 0.25 + 0.65 * (0.5 - 0.5 * math.cos(rl.get_time() * 7.0))
+    rl.draw_texture_ex(draw_net_txt, rl.Vector2(draw_x, draw_y), 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity)))
 
 
 class MiciHomeLayout(Widget):
