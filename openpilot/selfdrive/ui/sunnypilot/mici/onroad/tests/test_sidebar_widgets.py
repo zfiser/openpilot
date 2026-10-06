@@ -104,19 +104,6 @@ class TestSidebarWidgets(unittest.TestCase):
     self.ui_state.sm = _Obj(recv_frame={})
     assert self.sidebar._indicator_reason() == "chill"
 
-  def test_steering_color_by_status(self):
-    mod, S = self.mod, self.UIStatus
-    expected = {
-      S.ENGAGED: mod.STEER_ACTIVE,
-      S.LAT_ONLY: mod.STEER_ACTIVE,
-      S.OVERRIDE: mod.STEER_PAUSED,
-      S.DISENGAGED: mod.STEER_OFF,
-      S.LONG_ONLY: mod.STEER_OFF,
-    }
-    for status, color in expected.items():
-      self.ui_state.status = status
-      assert self.sidebar._steering_color() is color, status
-
 
 if __name__ == "__main__":
   unittest.main()

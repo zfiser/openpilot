@@ -7,16 +7,13 @@ See the LICENSE.md file in the root directory for more details.
 import pyray as rl
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
-from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets import Widget
 
 WHITE = rl.Color(255, 255, 255, 255)
 BLACK = rl.Color(0, 0, 0, 255)
 BLUE = rl.Color(112, 192, 216, 255)
 TRAFFIC_RED = rl.Color(200, 32, 48, 255)
-STEER_ACTIVE = rl.Color(0, 255, 38, 255)
-STEER_PAUSED = rl.Color(137, 146, 141, 255)
-STEER_OFF = rl.Color(70, 70, 70, 255)
 
 
 def _v(x: float, y: float) -> rl.Vector2:
@@ -34,7 +31,7 @@ def _draw_quad_outline(points: tuple[tuple[float, float], ...], thickness: float
 
 
 class MiciSidebarWidgets(Widget):
-  """Static confidence circle on top, lead car / stop light in the middle, steering status at the bottom."""
+  """Static confidence circle on top, lead car / stop light in the middle. The bottom third is left empty."""
 
   def __init__(self, confidence_ball: ConfidenceBall):
     super().__init__()
@@ -52,11 +49,9 @@ class MiciSidebarWidgets(Widget):
     slot_height = sidebar.height / 3
     confidence_slot = rl.Rectangle(sidebar.x, sidebar.y, sidebar.width, slot_height)
     indicator_slot = rl.Rectangle(sidebar.x, sidebar.y + slot_height, sidebar.width, slot_height)
-    steering_slot = rl.Rectangle(sidebar.x, sidebar.y + slot_height * 2, sidebar.width, sidebar.height - slot_height * 2)
 
     self._confidence_ball.render_static(confidence_slot, max(16, min(20, int(slot_height * 0.28))))
     self._draw_indicator(indicator_slot)
-    self._draw_steering_status(steering_slot)
 
   def _indicator_reason(self) -> str:
     # a lead is the reason for slowing or stopping when there is one, so it wins over the stop light
@@ -134,24 +129,3 @@ class MiciSidebarWidgets(Widget):
       rl.draw_circle_lines(int(cx), int(bulb_y), 6, WHITE)
     rl.draw_circle_lines(int(cx), int(cy - 16), 7, TRAFFIC_RED)
     rl.draw_circle(int(cx), int(cy - 16), 4, TRAFFIC_RED)
-
-  @staticmethod
-  def _steering_color() -> rl.Color:
-    # ui_state.status already folds in MADS: paused/overriding is reported as override
-    if ui_state.status in (UIStatus.ENGAGED, UIStatus.LAT_ONLY):
-      return STEER_ACTIVE
-    if ui_state.status == UIStatus.OVERRIDE:
-      return STEER_PAUSED
-    return STEER_OFF
-
-  def _draw_steering_status(self, rect: rl.Rectangle) -> None:
-    cx = rect.x + rect.width / 2
-    cy = rect.y + rect.height / 2
-    color = self._steering_color()
-    radius = 17
-
-    rl.draw_ring(_v(cx, cy), radius - 3, radius, 0, 360, 40, color)
-    rl.draw_circle(int(cx), int(cy), 4, color)
-    _draw_line(cx - radius + 2, cy, cx - 4, cy, 3, color)
-    _draw_line(cx + 4, cy, cx + radius - 2, cy, 3, color)
-    _draw_line(cx, cy + 4, cx, cy + radius - 2, 3, color)
