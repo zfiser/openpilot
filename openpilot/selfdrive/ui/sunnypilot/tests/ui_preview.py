@@ -32,17 +32,18 @@ SCENARIOS = {
   rl.KeyboardKey.KEY_THREE: ("stop light", False, True, True, [("odometer", "Odometer", 54321.0, "km", True)]),
   rl.KeyboardKey.KEY_FOUR: ("disengaged, odometer missing", False, False, False, [("odometer", "Odometer", 0.0, "km", False)]),
   rl.KeyboardKey.KEY_FIVE: ("many items", True, False, True, [
-    ("odometer", "Odometer", 54321.0, "km", True), ("tire_fl", "Tire FL", 36.5, "psi", True),
-    ("tire_fr", "Tire FR", 35.0, "psi", True), ("battery", "12V battery", 13.84, "V", True),
-    ("hv", "Hybrid battery", 62.0, "%", True), ("temp", "Outside temp", -3.0, "C", True)]),
+    ("odometer", "Odometer", 54321.0, "km", True), ("rpm", "Engine RPM", 1800.0, "rpm", True),
+    ("tire_temp_fl", "Tire FL temp", 32.0, "C", True), ("tire_temp_fr", "Tire FR temp", 33.5, "C", True),
+    ("battery", "12V battery", 13.84, "V", True), ("hv", "Hybrid battery", 62.0, "%", True)]),
 }
 
 
 def animate_item(item, t: float):
   """Make the fake car data move a little so the page looks alive, odometer counts up, the rest wobbles."""
   key, label, value, unit, valid = item
-  wobble = {"odometer": 0.0, "battery": 0.25 * math.sin(t * 1.3), "tire_fl": 0.4 * math.sin(t * 0.7),
-            "tire_fr": 0.4 * math.sin(t * 0.9), "hv": 3.0 * math.sin(t * 0.2), "temp": 0.5 * math.sin(t * 0.1)}.get(key, 0.0)
+  wobble = {"odometer": 0.0, "battery": 0.25 * math.sin(t * 1.3), "rpm": 600.0 * math.sin(t * 0.8),
+            "tire_temp_fl": 1.5 * math.sin(t * 0.3), "tire_temp_fr": 1.5 * math.sin(t * 0.35),
+            "hv": 3.0 * math.sin(t * 0.2)}.get(key, 0.0)
   return key, label, value + wobble + (t * 0.01 if key == "odometer" else 0.0), unit, valid
 
 
