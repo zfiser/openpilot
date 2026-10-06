@@ -16,7 +16,9 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 
 RPM_FONT_SIZE = 30
 RPM_SMOOTHING_TAU = 0.25  # seconds, an exponential average, higher is smoother but slower to follow
-RPM_BOTTOM_OFFSET = 74  # text top, measured up from the bottom of the road view so it sits above the torque bar
+RPM_TOP_OFFSET = 12  # distance of the text from the top edge of the road view
+RPM_OPACITY = 0.6
+RPM_COLOR = rl.Color(255, 255, 255, int(255 * RPM_OPACITY))
 
 
 class HudRendererSP(HudRenderer):
@@ -46,12 +48,12 @@ class HudRendererSP(HudRenderer):
     self._draw_rpm(rect)
 
   def _draw_rpm(self, rect: rl.Rectangle) -> None:
-    """Engine RPM, bottom centre above the torque bar. Not drawn while the engine is off or the car does not report it."""
+    """Engine RPM, top centre. Not drawn while the engine is off or the car does not report it."""
     if self._rpm_text is None:
       return
     size = measure_text_cached(self._rpm_font, self._rpm_text, RPM_FONT_SIZE)
-    pos = rl.Vector2(rect.x + rect.width / 2 - size.x / 2, rect.y + rect.height - RPM_BOTTOM_OFFSET)
-    rl.draw_text_ex(self._rpm_font, self._rpm_text, pos, RPM_FONT_SIZE, 0, rl.WHITE)
+    pos = rl.Vector2(rect.x + rect.width / 2 - size.x / 2, rect.y + RPM_TOP_OFFSET)
+    rl.draw_text_ex(self._rpm_font, self._rpm_text, pos, RPM_FONT_SIZE, 0, RPM_COLOR)
 
   def _has_blind_spot_detected(self) -> bool:
 
