@@ -46,18 +46,7 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       self._confidence_filter.update((1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.brakeDisengageProbs or [1])) *
                                                         (1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs or [1])))
 
-  def _render(self, _):
-    content_rect = rl.Rectangle(
-      self.rect.x + self.rect.width - SIDE_PANEL_WIDTH,
-      self.rect.y,
-      SIDE_PANEL_WIDTH,
-      self.rect.height,
-    )
-
-    status_dot_radius = 24
-    dot_height = (1 - self._confidence_filter.x) * (content_rect.height - 2 * status_dot_radius) + status_dot_radius
-    dot_height = self._rect.y + dot_height
-
+  def _dot_colors(self) -> tuple[rl.Color, rl.Color]:
     # confidence zones
     if ui_state.status == UIStatus.ENGAGED or self._demo:
       if self._confidence_filter.x > 0.5:
@@ -80,6 +69,31 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     else:
       top_dot_color = rl.Color(50, 50, 50, 255)
       bottom_dot_color = rl.Color(13, 13, 13, 255)
+
+    return top_dot_color, bottom_dot_color
+
+  def render_static(self, rect: rl.Rectangle, radius: int = 20) -> None:
+    self._update_state()
+    top_dot_color, bottom_dot_color = self._dot_colors()
+    draw_circle_gradient(rect.x + rect.width / 2,
+                         rect.y + rect.height / 2,
+                         radius,
+                         top_dot_color,
+                         bottom_dot_color)
+
+  def _render(self, _):
+    content_rect = rl.Rectangle(
+      self.rect.x + self.rect.width - SIDE_PANEL_WIDTH,
+      self.rect.y,
+      SIDE_PANEL_WIDTH,
+      self.rect.height,
+    )
+
+    status_dot_radius = 24
+    dot_height = (1 - self._confidence_filter.x) * (content_rect.height - 2 * status_dot_radius) + status_dot_radius
+    dot_height = self._rect.y + dot_height
+
+    top_dot_color, bottom_dot_color = self._dot_colors()
 
     draw_circle_gradient(content_rect.x + content_rect.width - status_dot_radius,
                          dot_height, status_dot_radius,

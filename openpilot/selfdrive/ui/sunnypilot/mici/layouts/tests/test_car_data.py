@@ -1,0 +1,95 @@
+"""
+Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
+
+This file is part of sunnypilot and is licensed under the MIT License.
+See the LICENSE.md file in the root directory for more details.
+"""
+import importlib.util
+import sys
+import types
+import unittest
+from pathlib import Path
+from unittest import mock
+
+MODULE_PATH = Path(__file__).resolve().parents[1] / "car_data.py"
+
+
+class _Obj:
+  def __init__(self, **kw):
+    self.__dict__.update(kw)
+
+
+class _Widget:
+  def __init__(self, *args, **kwargs):
+    pass
+
+
+def _stub_module(name: str, **attrs) -> types.ModuleType:
+  mod = types.ModuleType(name)
+  mod.__dict__.update(attrs)
+  return mod
+
+
+def _load():
+  """Import car_data.py with the graphics/UI dependencies stubbed, so the logic is testable headless."""
+  ui_state = _Obj(started_frame=0, sm=None)
+  stubs = {
+    "pyray": mock.MagicMock(),
+    "openpilot": _stub_module("openpilot"),
+    "openpilot.selfdrive": _stub_module("openpilot.selfdrive"),
+    "openpilot.selfdrive.ui": _stub_module("openpilot.selfdrive.ui"),
+    "openpilot.selfdrive.ui.ui_state": _stub_module("openpilot.selfdrive.ui.ui_state", ui_state=ui_state),
+    "openpilot.system": _stub_module("openpilot.system"),
+    "openpilot.system.ui": _stub_module("openpilot.system.ui"),
+    "openpilot.system.ui.lib": _stub_module("openpilot.system.ui.lib"),
+    "openpilot.system.ui.lib.application": _stub_module(
+      "openpilot.system.ui.lib.application", FontWeight=mock.MagicMock(), gui_app=_Obj(height=240),
+      TextAlignment=mock.MagicMock(), TextAlignmentVertical=mock.MagicMock()),
+    "openpilot.system.ui.widgets": _stub_module("openpilot.system.ui.widgets", Widget=_Widget),
+    "openpilot.system.ui.widgets.label": _stub_module("openpilot.system.ui.widgets.label", UnifiedLabel=mock.MagicMock()),
+  }
+  with mock.patch.dict(sys.modules, stubs):
+    spec = importlib.util.spec_from_file_location("car_data_under_test", MODULE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+  return module, ui_state
+
+
+class _SM(dict):
+  def __init__(self, items, frame: int = 1):
+    super().__init__({"carStateSP": _Obj(carData=items)})
+    self.recv_frame = {"carStateSP": frame}
+
+
+class TestCarData(unittest.TestCase):
+  def setUp(self):
+    self.mod, self.ui_state = _load()
+
+  def test_format_invalid(self):
+    assert self.mod.format_value(123.0, "km", False) == "--"
+
+  def test_format_integer_and_thousands(self):
+    assert self.mod.format_value(54321.0, "km", True) == "54,321 km"
+    assert self.mod.format_value(42.0, "psi", True) == "42 psi"
+
+  def test_format_decimal(self):
+    assert self.mod.format_value(13.84, "V", True) == "13.8 V"
+
+  def test_format_no_unit(self):
+    assert self.mod.format_value(7.0, "", True) == "7"
+
+  def test_items_returned(self):
+    items = [_Obj(key="odometer"), _Obj(key="fuel")]
+    assert [i.key for i in self.mod.get_items(_SM(items))] == ["odometer", "fuel"]
+
+  def test_stale_message_ignored(self):
+    # carStateSP not received since this drive started
+    self.ui_state.started_frame = 10
+    assert self.mod.get_items(_SM([_Obj(key="odometer")], frame=5)) == []
+
+  def test_missing_service_does_not_raise(self):
+    assert self.mod.get_items(_Obj(recv_frame={})) == []
+
+
+if __name__ == "__main__":
+  unittest.main()

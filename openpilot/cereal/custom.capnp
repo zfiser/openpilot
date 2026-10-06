@@ -447,6 +447,17 @@ struct BackupManagerSP @0xf98d843bfd7004a3 {
 
 struct CarStateSP @0xb86e6369214c01c8 {
   speedLimit @0 :Float32;
+  carData @1 :List(CarDataItem);
+
+  # generic, brand-agnostic extra car data (odometer, tire pressure, ...) shown on the car data page.
+  # filled by the per-brand carstate_ext, the UI just renders whatever arrives
+  struct CarDataItem {
+    key @0 :Text;
+    label @1 :Text;
+    value @2 :Float32;
+    unit @3 :Text;
+    valid @4 :Bool;
+  }
 }
 
 struct LiveMapDataSP @0xf416ec09499d9d19 {

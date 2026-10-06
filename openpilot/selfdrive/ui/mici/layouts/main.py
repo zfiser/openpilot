@@ -1,5 +1,4 @@
 import pyray as rl
-import openpilot.cereal.messaging as messaging
 from openpilot.selfdrive.ui.mici.layouts.home import MiciHomeLayout
 from openpilot.selfdrive.ui.mici.layouts.settings.settings import SettingsLayout
 from openpilot.selfdrive.ui.mici.layouts.offroad_alerts import MiciOffroadAlerts
@@ -14,6 +13,7 @@ from openpilot.system.ui.lib.application import gui_app
 if gui_app.sunnypilot_ui():
   from openpilot.selfdrive.ui.sunnypilot.mici.layouts.settings import SettingsLayoutSP as SettingsLayout
   from openpilot.selfdrive.ui.sunnypilot.mici.layouts.home import MiciHomeLayoutSP as MiciHomeLayout
+  from openpilot.selfdrive.ui.sunnypilot.mici.layouts.car_data import MiciCarDataLayout
 
 ONROAD_DELAY = 2.5  # seconds
 
@@ -21,8 +21,6 @@ ONROAD_DELAY = 2.5  # seconds
 class MiciMainLayout(Scroller):
   def __init__(self):
     super().__init__(snap_items=True, spacing=0, pad=0, scroll_indicator=False, edge_shadows=False)
-
-    self._pm = messaging.PubMaster(['bookmarkButton', 'userBookmark'])
 
     self._prev_onroad = False
     self._prev_standstill = False
@@ -33,12 +31,15 @@ class MiciMainLayout(Scroller):
     self._home_layout = MiciHomeLayout()
     self._alerts_layout = MiciOffroadAlerts()
     self._settings_layout = SettingsLayout()
-    self._car_onroad_layout = AugmentedRoadView(bookmark_callback=self._on_bookmark_clicked)
+    self._car_onroad_layout = AugmentedRoadView()
+    self._car_data_layout = MiciCarDataLayout() if gui_app.sunnypilot_ui() else None
     self._body_onroad_layout = BodyLayout()
 
     # Initialize widget rects
     for widget in (self._home_layout, self._alerts_layout, self._settings_layout,
-                   self._car_onroad_layout, self._body_onroad_layout):
+                   self._car_onroad_layout, self._car_data_layout, self._body_onroad_layout):
+      if widget is None:
+        continue
       # TODO: set parent rect and use it if never passed rect from render (like in Scroller)
       widget.set_rect(rl.Rectangle(0, 0, gui_app.width, gui_app.height))
 
@@ -46,12 +47,10 @@ class MiciMainLayout(Scroller):
       self._alerts_layout,
       self._home_layout,
       self._car_onroad_layout,
+      *([self._car_data_layout] if self._car_data_layout is not None else []),
       self._body_onroad_layout,
     ])
     self._scroller.set_reset_scroll_at_show(False)
-
-    # Disable scrolling when onroad is interacting with bookmark
-    self._scroller.set_scrolling_enabled(lambda: not self._car_onroad_layout.is_swiping_left())
 
     # Set callbacks
     self._setup_callbacks()
@@ -144,11 +143,6 @@ class MiciMainLayout(Scroller):
       # Screen turns off on timeout offroad, so pop immediately without animation
       gui_app.pop_widgets_to(self, instant=True)
       self._scroll_to(self._home_layout)
-
-  def _on_bookmark_clicked(self):
-    for service in ('bookmarkButton', 'userBookmark'):
-      msg = messaging.new_message(service, valid=True)
-      self._pm.send(service, msg)
 
   def _on_body_changed(self):
     self._car_onroad_layout.set_visible(not ui_state.is_body)
