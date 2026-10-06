@@ -15,6 +15,8 @@ from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 
 RPM_FONT_SIZE = 30
+RPM_UNIT_FONT_SIZE = 22
+RPM_UNIT_GAP = 6  # between the number and the unit
 RPM_SMOOTHING_TAU = 0.25  # seconds, an exponential average, higher is smoother but slower to follow
 RPM_TOP_OFFSET = 12  # distance of the text from the top edge of the road view
 RPM_OPACITY = 0.6
@@ -51,9 +53,13 @@ class HudRendererSP(HudRenderer):
     """Engine RPM, top centre. Not drawn while the engine is off or the car does not report it."""
     if self._rpm_text is None:
       return
+    # only the number is centred, the unit hangs off its right side and its bottom lines up with the number
     size = measure_text_cached(self._rpm_font, self._rpm_text, RPM_FONT_SIZE)
+    unit_size = measure_text_cached(self._rpm_font, "rpm", RPM_UNIT_FONT_SIZE)
     pos = rl.Vector2(rect.x + rect.width / 2 - size.x / 2, rect.y + RPM_TOP_OFFSET)
+    unit_pos = rl.Vector2(pos.x + size.x + RPM_UNIT_GAP, pos.y + size.y - unit_size.y - 2)
     rl.draw_text_ex(self._rpm_font, self._rpm_text, pos, RPM_FONT_SIZE, 0, RPM_COLOR)
+    rl.draw_text_ex(self._rpm_font, "rpm", unit_pos, RPM_UNIT_FONT_SIZE, 0, RPM_COLOR)
 
   def _has_blind_spot_detected(self) -> bool:
 

@@ -20,10 +20,10 @@ def find_rpm(sm, started_frame: int) -> float | None:
 
 
 def format_rpm(rpm: float | None) -> str | None:
-  """Text for the driving screen, None while the engine is off or the value is unknown."""
+  """The number shown on the driving screen (the unit is drawn separately), None while the engine is off or unknown."""
   if rpm is None:
     return None
   rounded = round(rpm / 10) * 10  # the last digit only jitters
   if rounded <= 0:
     return None
-  return f"{rounded:,} rpm"
+  return f"{rounded:,}"

@@ -44,11 +44,11 @@ class TestRpm(unittest.TestCase):
     assert rpm.find_rpm(_Obj(recv_frame={}), 0) is None
 
   def test_format(self):
-    assert rpm.format_rpm(1850.4) == "1,850 rpm"
-    assert rpm.format_rpm(1854.0) == "1,850 rpm"
-    assert rpm.format_rpm(1856.0) == "1,860 rpm"
-    assert rpm.format_rpm(980.0) == "980 rpm"
-    assert rpm.format_rpm(5200.0) == "5,200 rpm"
+    assert rpm.format_rpm(1850.4) == "1,850"
+    assert rpm.format_rpm(1854.0) == "1,850"
+    assert rpm.format_rpm(1856.0) == "1,860"
+    assert rpm.format_rpm(980.0) == "980"
+    assert rpm.format_rpm(5200.0) == "5,200"
 
   def test_hidden_when_engine_off_or_unknown(self):
     assert rpm.format_rpm(0.0) is None
