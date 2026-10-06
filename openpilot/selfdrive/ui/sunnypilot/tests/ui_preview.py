@@ -9,7 +9,7 @@ Open the mici UI in a window on a PC with fake onroad data, to look at the sideb
 
   python selfdrive/ui/sunnypilot/tests/ui_preview.py
 
-Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario. The values animate (lead distance, confidence, steering, car data).
+Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario. The values animate (lead distance, confidence, steering, driver head, car data).
 Add --shots DIR to render every scenario headless and save PNGs of the road view and the car data page.
 """
 import argparse
@@ -53,6 +53,8 @@ def send_state(pm: PubMaster, scenario, t: float | None = None) -> None:
   lead_distance = 32.4 if t is None else 32.0 + 18.0 * math.sin(t * 0.5)
   confidence = 0.9 if t is None else 0.5 + 0.5 * math.sin(t * 0.3)  # sweeps the circle from green over orange to red
   steering_angle = 0.0 if t is None else 25.0 * math.sin(t * 0.4)
+  head_yaw = 0.0 if t is None else 0.6 * math.sin(t * 0.6)  # driver looks around, radians
+  head_pitch = 0.0 if t is None else 0.25 * math.sin(t * 0.9)
 
   ds = messaging.new_message('deviceState')
   ds.deviceState.started = True
@@ -87,6 +89,15 @@ def send_state(pm: PubMaster, scenario, t: float | None = None) -> None:
   mv.modelV2.meta.disengagePredictions.brakeDisengageProbs = [1.0 - confidence]
   mv.modelV2.meta.disengagePredictions.steerOverrideProbs = [0.0]
   pm.send('modelV2', mv)
+
+  dm = messaging.new_message('driverMonitoringState')
+  dm.driverMonitoringState.activePolicy = log.DriverMonitoringState.MonitoringPolicy.vision
+  dm.driverMonitoringState.visionPolicyState.faceDetected = True
+  dm.driverMonitoringState.visionPolicyState.awarenessPercent = 100.0
+  dm.driverMonitoringState.visionPolicyState.pose.yaw = head_yaw
+  dm.driverMonitoringState.visionPolicyState.pose.pitch = head_pitch
+  pm.send('driverMonitoringState', dm)
+  pm.send('driverStateV2', messaging.new_message('driverStateV2'))
 
   lp = messaging.new_message('longitudinalPlan')
   lp.longitudinalPlan.shouldStop = stop
@@ -151,7 +162,8 @@ def main() -> None:
     layout = MiciMainLayout()
     device.set_override_interactive_timeout(99999)
 
-    pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2"])
+    pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2",
+                   "driverMonitoringState", "driverStateV2"])
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)
