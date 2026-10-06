@@ -49,6 +49,6 @@ class DailyDistance:
     if state is None or state["date"] != today or state["unit"] != odometer.unit or odometer.value < state["start"]:
       state = {"date": today, "start": float(odometer.value), "unit": odometer.unit}
       self._state = state
-      self._params.put(PARAM, state)
+      self._params.put(PARAM, state, block=True)  # once a day, wait until it is really stored
 
     return make_car_data_item("today", "Today", odometer.value - state["start"], odometer.unit)

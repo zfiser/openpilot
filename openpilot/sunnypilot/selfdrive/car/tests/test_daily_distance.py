@@ -18,7 +18,8 @@ class FakeParams:
   def get(self, key):
     return self.values.get(key)
 
-  def put(self, key, value):
+  def put(self, key, value, block=False):
+    assert block, "the daily baseline must be written with block=True so it survives a power cut"
     self.values[key] = value
     self.writes += 1
 
