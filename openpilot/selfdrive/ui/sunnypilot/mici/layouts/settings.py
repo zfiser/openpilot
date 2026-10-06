@@ -50,15 +50,10 @@ class SettingsLayoutSP(OP.SettingsLayout):
     models_btn = SettingsBigButton(tr("models"), "", gui_app.texture("../../sunnypilot/selfdrive/assets/offroad/icon_models.png", ICON_SIZE, ICON_SIZE))
     models_btn.set_click_callback(lambda: gui_app.push_widget(models_panel))
 
-    # onroad: enable button sits at the front (left of toggles)
-    self._enable_offroad_btn_onroad = BigCircleButton(self.icon_offroad_enable, red=True)
-    self._enable_offroad_btn_onroad.set_click_callback(lambda: self._handle_always_offroad(True))
-    self._enable_offroad_btn_onroad.set_visible(lambda: ui_state.started and not ui_state.always_offroad)
-
-    # offroad: enable button sits at the end (right of developer)
-    self._enable_offroad_btn_offroad = BigCircleButton(self.icon_offroad_enable, red=True)
-    self._enable_offroad_btn_offroad.set_click_callback(lambda: self._handle_always_offroad(True))
-    self._enable_offroad_btn_offroad.set_visible(lambda: not ui_state.started and not ui_state.always_offroad)
+    # enable button always sits at the end of the list (right of developer), onroad or offroad
+    self._enable_offroad_btn = BigCircleButton(self.icon_offroad_enable, red=True)
+    self._enable_offroad_btn.set_click_callback(lambda: self._handle_always_offroad(True))
+    self._enable_offroad_btn.set_visible(lambda: not ui_state.always_offroad)
 
     self._disable_offroad_btn = BigCircleButton(self.icon_offroad_disable, red=False)
     self._disable_offroad_btn.set_click_callback(lambda: self._handle_always_offroad(False))
@@ -69,11 +64,9 @@ class SettingsLayoutSP(OP.SettingsLayout):
     items.insert(1, models_btn)
     items.insert(5, sunnylink_btn)
 
-    # front slots (only one ever visible at a time): exit-always-offroad, then enable-onroad
-    items.insert(0, self._enable_offroad_btn_onroad)
+    # exit-always-offroad sits at the front while always offroad is on (only one of the two buttons is visible at a time)
     items.insert(0, self._disable_offroad_btn)
-    # end slot: enable-offroad (right of developer)
-    items.append(self._enable_offroad_btn_offroad)
+    items.append(self._enable_offroad_btn)
 
     self._scroller._items.clear()
     for item in items:
