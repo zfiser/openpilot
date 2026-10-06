@@ -9,7 +9,8 @@ Open the mici UI in a window on a PC with fake onroad data, to look at the sideb
 
   python selfdrive/ui/sunnypilot/tests/ui_preview.py
 
-Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario. The values animate (lead distance, confidence, steering, driver head, car data).
+Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario, M switches between metric and imperial units (--metric starts in metric).
+The values animate (lead distance, confidence, steering, driver head, car data).
 Add --shots DIR to render every scenario headless and save PNGs of the road view and the car data page.
 """
 import argparse
@@ -143,6 +144,7 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
 def main() -> None:
   parser = argparse.ArgumentParser()
   parser.add_argument("--shots", metavar="DIR", help="render all scenarios headless and save PNGs")
+  parser.add_argument("--metric", action="store_true", help="start with the metric unit setting on (distances in m, not ft)")
   args = parser.parse_args()
 
   if args.shots:
@@ -157,6 +159,11 @@ def main() -> None:
     from openpilot.system.ui.lib.application import gui_app
 
     gui_app.init_window("ui preview", fps=60)
+
+    def set_metric(value: bool) -> None:
+      ui_state.params.put_bool("IsMetric", value)
+      ui_state.is_metric = value  # ui_state only re-reads the param every few seconds
+    set_metric(args.metric)
 
     from openpilot.selfdrive.ui.mici.layouts.main import MiciMainLayout
     layout = MiciMainLayout()
@@ -179,6 +186,9 @@ def main() -> None:
         if rl.is_key_pressed(key):
           scenario = value
           print("scenario:", value[0])
+      if rl.is_key_pressed(rl.KeyboardKey.KEY_M):
+        set_metric(not ui_state.is_metric)
+        print("metric:", ui_state.is_metric)
       send_state(pm, scenario, time.monotonic() - start)
       ui_state.update()
 
