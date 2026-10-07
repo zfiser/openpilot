@@ -78,6 +78,18 @@ class TestCarData(unittest.TestCase):
   def test_format_no_unit(self):
     assert self.mod.format_value(7.0, "", True) == "7"
 
+  def test_tile_columns(self):
+    assert [self.mod.tile_columns(n) for n in (1, 4, 5, 9, 10, 12)] == [2, 2, 3, 3, 4, 4]
+
+  def test_tile_text_sizes_fit_and_shrink(self):
+    big = self.mod.tile_text_sizes(80, 2, 1.0)
+    small = self.mod.tile_text_sizes(48, 3, 1.0)
+    assert big[0] <= 17 and big[1] <= 34
+    assert small[0] < big[0] or small[1] < big[1]
+    for columns in (2, 3, 4):
+      label, value = self.mod.tile_text_sizes(40, columns, 1.0)
+      assert label * 1.3 + value * 1.2 <= 40 + 12  # label row plus value row stay about tile height
+
   def test_items_returned(self):
     items = [_Obj(key="odometer"), _Obj(key="fuel")]
     assert [i.key for i in self.mod.get_items(_SM(items))] == ["odometer", "fuel"]
