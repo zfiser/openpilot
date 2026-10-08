@@ -25,21 +25,23 @@ class FakeParams:
 
 
 class Clock:
+  """A time source that can be unknown (None), like the car clock or the device clock before it is set."""
+
   def __init__(self, when: datetime.datetime):
     self.when = when
     self.valid = True
 
   def __call__(self):
-    return self.when
+    return self.when if self.valid else None
 
 
 def odo(value, unit="km", valid=True):
   return [make_car_data_item("odometer", "Odometer", value if valid else None, unit)]
 
 
-def make(stored=None, when=datetime.datetime(2026, 10, 6, 8, 0)):
+def make(stored=None, when=datetime.datetime(2026, 10, 6, 8, 0, tzinfo=datetime.UTC)):
   params, clock = FakeParams(stored), Clock(when)
-  return DailyDistance(params, now=clock, time_valid=lambda: clock.valid), params, clock
+  return DailyDistance(params, now=clock, tz=datetime.UTC), params, clock
 
 
 def stored(date="2026-10-06", start=10000.0, unit="km", last=None):
@@ -72,7 +74,7 @@ class TestDailyDistance:
 
   def test_resets_after_midnight(self):
     dd, params, clock = make(stored=stored(last=10080.0))
-    clock.when = datetime.datetime(2026, 10, 7, 0, 0, 1)
+    clock.when = datetime.datetime(2026, 10, 7, 0, 0, 1, tzinfo=datetime.UTC)
     assert dd.update(odo(10090)).value == 0
     assert params.values[PARAM] == stored(date="2026-10-07", start=10090.0)
     assert dd.update(odo(10095)).value == 5
@@ -112,8 +114,15 @@ class TestDailyDistance:
   def test_invalid_clock_does_not_reset_a_known_day(self):
     dd, _, clock = make(stored=stored(last=10020.0))
     clock.valid = False
-    clock.when = datetime.datetime(1970, 1, 1)
     assert dd.update(odo(10030)).value == 30
+
+  def test_the_date_follows_the_time_zone(self):
+    # 23:30 UTC is already the next day two hours east
+    when = datetime.datetime(2026, 10, 6, 23, 30, tzinfo=datetime.UTC)
+    params = FakeParams()
+    dd = DailyDistance(params, now=lambda: when, tz=datetime.timezone(datetime.timedelta(hours=2)))
+    dd.update(odo(10000))
+    assert params.values[PARAM]["date"] == "2026-10-07"
 
   def test_garbage_in_storage_is_ignored(self):
     for bad in ("nonsense", {"date": "2026-10-06"}, {"start": 1}, 5):
