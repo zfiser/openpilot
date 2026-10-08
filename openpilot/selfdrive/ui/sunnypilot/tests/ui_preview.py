@@ -112,6 +112,11 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   rs.radarState.leadOne.dRel = lead_distance
   pm.send('radarState', rs)
 
+  gps = messaging.new_message('gpsLocationExternal')
+  gps.gpsLocationExternal.hasFix = True
+  gps.gpsLocationExternal.speed = (25.0 if moving else 0.0) + (0.0 if t is None else 3.0 * math.sin(t * 0.5))
+  pm.send('gpsLocationExternal', gps)
+
   car = messaging.new_message('carState')
   car.carState.vEgo = 20.0 if moving else 0.0
   car.carState.standstill = not moving
@@ -206,7 +211,7 @@ def main() -> None:
     device.set_override_interactive_timeout(99999)
 
     pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2",
-                   "driverMonitoringState", "driverStateV2", "peripheralState", "selfdriveStateSP"])
+                   "driverMonitoringState", "driverStateV2", "peripheralState", "selfdriveStateSP", "gpsLocationExternal"])
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)

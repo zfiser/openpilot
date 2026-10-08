@@ -57,7 +57,13 @@ def _load_sidebar():
     "openpilot.system.ui.lib": _stub_module("openpilot.system.ui.lib"),
     "openpilot.system.ui.lib.application": _stub_module(
       "openpilot.system.ui.lib.application", FontWeight=mock.MagicMock(), TextAlignment=mock.MagicMock(),
-      TextAlignmentVertical=mock.MagicMock()),
+      TextAlignmentVertical=mock.MagicMock(), gui_app=mock.MagicMock()),
+    "openpilot.system.ui.lib.text_measure": _stub_module("openpilot.system.ui.lib.text_measure", measure_text_cached=mock.MagicMock()),
+    "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed": _stub_module(
+      "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed", gps_speed=mock.MagicMock(return_value=None)),
+    "openpilot.selfdrive.ui.sunnypilot": _stub_module("openpilot.selfdrive.ui.sunnypilot"),
+    "openpilot.selfdrive.ui.sunnypilot.mici": _stub_module("openpilot.selfdrive.ui.sunnypilot.mici"),
+    "openpilot.selfdrive.ui.sunnypilot.mici.onroad": _stub_module("openpilot.selfdrive.ui.sunnypilot.mici.onroad"),
     "openpilot.system.ui.widgets": _stub_module("openpilot.system.ui.widgets", Widget=_Widget),
     "openpilot.system.ui.widgets.label": _stub_module("openpilot.system.ui.widgets.label", UnifiedLabel=mock.MagicMock()),
   }
