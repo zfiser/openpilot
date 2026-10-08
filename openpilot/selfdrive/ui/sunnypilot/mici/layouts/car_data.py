@@ -17,6 +17,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import Scroller
 
 CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goes back, used while the global timeout is on its default
+FIRST_KEYS = ("today", "battery_12v")  # the first row of the page
 HIDDEN_KEYS = {"lead_distance", "friction_brake_force"}  # shown on the road view instead
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)
@@ -41,6 +42,12 @@ def format_value(value: float, unit: str, valid: bool) -> str:
     return "--"
   text = f"{value:,.0f}" if abs(value) >= 1000 or abs(value - round(value)) < 1e-3 else f"{value:.1f}"
   return f"{text} {unit}".rstrip()
+
+
+def order_items(items: list) -> list:
+  """'Today' first and the 12 V battery second, so they are the first row; everything else keeps its order."""
+  first = [next((i for i in items if i.key == key), None) for key in FIRST_KEYS]
+  return [i for i in first if i is not None] + [i for i in items if i.key not in FIRST_KEYS]
 
 
 def rows_of(items: list, columns: int = COLUMNS) -> list[list]:
@@ -159,6 +166,7 @@ class MiciCarDataLayout(Scroller):
     items = get_items(ui_state.sm) or self._stored_items()
     if (battery := voltage_item(ui_state.sm)) is not None:
       items = [*items, battery]
+    items = order_items(items)
     self._has_items = bool(items)
 
     rows = rows_of(items)

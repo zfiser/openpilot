@@ -79,6 +79,11 @@ class DriverStateRenderer(Widget):
     return (self._should_draw and ui_state.sm["selfdriveState"].alertSize == AlertSize.none and
             ui_state.sm.recv_frame["driverStateV2"] > ui_state.started_frame)
 
+  @property
+  def attention_needed(self) -> bool:
+    """True while the driver monitoring is active and the awareness has dropped, when the cone turns from green to orange."""
+    return self._awareness_unfull
+
   def set_force_active(self, force_active: bool):
     """Force the dmoji to always appear active (green) regardless of actual state"""
     self._force_active = force_active

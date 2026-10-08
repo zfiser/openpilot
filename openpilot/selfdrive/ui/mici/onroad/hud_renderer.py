@@ -219,6 +219,9 @@ class HudRenderer(Widget):
     rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * alpha)))
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
+    if gui_app.sunnypilot_ui() and not self._show_wheel_critical:
+      return  # the plain wheel and its turn intent marks are hidden, only the steer required warning is kept
+
     wheel_txt = self._txt_wheel_critical if self._show_wheel_critical else self._txt_wheel
 
     bsm_detected = self._has_blind_spot_detected() if gui_app.sunnypilot_ui() else False

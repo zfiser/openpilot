@@ -49,6 +49,8 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     # animate status dot in from bottom
     if ui_state.status == UIStatus.DISENGAGED:
       self._confidence_filter.update(-0.5)
+    elif ui_state.status == UIStatus.OVERRIDE:
+      return  # the driver is steering or pedalling, keep the confidence from just before
     elif ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
       self._confidence_filter.update(1 - max(self.get_animate_status_probs() or [1]))
     else:
@@ -56,8 +58,8 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
                                                         (1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs or [1])))
 
   def _dot_colors(self) -> tuple[rl.Color, rl.Color]:
-    # confidence zones, also in lateral only and longitudinal only (traffic light colours, not the flat mode colours)
-    if ui_state.status in (UIStatus.ENGAGED, UIStatus.LAT_ONLY, UIStatus.LONG_ONLY) or self._demo:
+    # confidence zones, also in lateral only, longitudinal only and while overriding (traffic light colours, not the flat mode colours)
+    if ui_state.status in (UIStatus.ENGAGED, UIStatus.LAT_ONLY, UIStatus.LONG_ONLY, UIStatus.OVERRIDE) or self._demo:
       zone = confidence_zone(self._confidence_filter.x)
       if zone == "high":
         top_dot_color = rl.Color(0, 255, 204, 255)
@@ -68,10 +70,6 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       else:
         top_dot_color = rl.Color(255, 0, 21, 255)
         bottom_dot_color = rl.Color(255, 0, 89, 255)
-
-    elif ui_state.status == UIStatus.OVERRIDE:
-      top_dot_color = rl.Color(255, 255, 255, 255)
-      bottom_dot_color = rl.Color(82, 82, 82, 255)
 
     else:
       top_dot_color = rl.Color(50, 50, 50, 255)

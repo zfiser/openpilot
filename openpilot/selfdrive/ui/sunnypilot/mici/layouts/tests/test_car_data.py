@@ -125,6 +125,17 @@ class TestCarData(unittest.TestCase):
     assert self.mod.page_timeout(None) == 15
     assert self.mod.page_timeout("x") == 15
 
+  def test_today_and_battery_lead_the_first_row(self):
+    keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
+    items = [_Obj(key=k) for k in ("odometer", "rpm", "battery_12v", "today", "lead")]
+    assert keys(items) == ["today", "battery_12v", "odometer", "rpm", "lead"]
+
+  def test_order_with_missing_items(self):
+    keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
+    assert keys([_Obj(key="odometer"), _Obj(key="battery_12v")]) == ["battery_12v", "odometer"]
+    assert keys([_Obj(key="odometer"), _Obj(key="today")]) == ["today", "odometer"]
+    assert keys([]) == []
+
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []

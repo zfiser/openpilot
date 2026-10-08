@@ -115,9 +115,19 @@ class TestConfidenceBall(unittest.TestCase):
         self.at(status, confidence)
         assert self.ball._dot_colors() == colours, (status, confidence)
 
-  def test_override_and_disengaged_keep_their_colours(self):
+  def test_override_keeps_the_confidence_colours(self):
+    green = ((0, 255, 204, 255), (0, 255, 38, 255))
+    red = ((255, 0, 21, 255), (255, 0, 89, 255))
+    for confidence, colours in ((0.9, green), (0.1, red)):
+      self.at(self.UIStatus.OVERRIDE, confidence)
+      assert self.ball._dot_colors() == colours
+
+  def test_override_holds_the_last_confidence(self):
     self.at(self.UIStatus.OVERRIDE, 0.9)
-    assert self.ball._dot_colors() == ((255, 255, 255, 255), (82, 82, 82, 255))
+    self.ball._update_state()
+    assert self.ball._confidence_filter.x == 0.9
+
+  def test_disengaged_keeps_its_colours(self):
     self.at(self.UIStatus.DISENGAGED, 0.9)
     assert self.ball._dot_colors() == ((50, 50, 50, 255), (13, 13, 13, 255))
 
