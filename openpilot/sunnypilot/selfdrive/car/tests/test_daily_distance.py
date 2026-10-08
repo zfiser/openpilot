@@ -218,4 +218,4 @@ class TestDailyDistanceTenths:
     dd, _, mono = make_moving()
     dd.update(odo(10000), 0.0)
     mono.t += 600.0  # the process was frozen for ten minutes
-    assert dd.update(odo(10000), 30.0).value < 0.02
+    assert dd.update(odo(10000), 30.0).value < 0.031  # one second at most (30 m), not 18 km
