@@ -20,8 +20,10 @@ CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goe
 ONE_DECIMAL_KEYS = {"today"}  # the daily distance has tenths
 # The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
 # there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
-STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("odometer", "Odometer", "km"),
-                  ("rpm", "Engine RPM", "rpm"), ("engine_temp", "Engine temp", "C"), ("lead_distance", "Lead distance", "m"), ("friction_brake_force", "Friction brake", "N"))
+STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("rpm", "Engine RPM", "rpm"),
+                  ("engine_temp", "Engine temp", "C"), ("lead_distance", "Lead distance", "m"),
+                  ("friction_brake_force", "Friction brake", "N"), ("odometer", "Odometer", "km"))
+LAST_USEFUL_KEY = "odometer"  # after everything else that is useful, before the experimental tiles
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)
@@ -60,13 +62,14 @@ def complete_items(items: list) -> list:
 
 
 def order_items(items: list) -> list:
-  """Standard tiles first in their fixed order (so 'today' and the 12 V battery are the first row), then whatever else the
-  car reports, the experimental tiles last."""
-  standard_keys = [key for key, _, _ in STANDARD_TILES]
+  """Standard tiles first in their fixed order (so 'today' and the 12 V battery are the first row, RPM and the engine
+  temperature the second), then whatever else the car reports, the odometer, and the experimental tiles last."""
+  standard_keys = [key for key, _, _ in STANDARD_TILES if key != LAST_USEFUL_KEY]
   standard = [next(i for i in items if i.key == key) for key in standard_keys if any(i.key == key for i in items)]
+  last_useful = [i for i in items if i.key == LAST_USEFUL_KEY]
   experimental = [i for i in items if i.key.startswith(EXPERIMENTAL_PREFIXES)]
-  other = [i for i in items if i.key not in standard_keys and not i.key.startswith(EXPERIMENTAL_PREFIXES)]
-  return standard + other + experimental
+  other = [i for i in items if i.key not in (*standard_keys, LAST_USEFUL_KEY) and not i.key.startswith(EXPERIMENTAL_PREFIXES)]
+  return standard + other + last_useful + experimental
 
 
 def rows_of(items: list, columns: int = COLUMNS) -> list[list]:

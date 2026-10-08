@@ -128,11 +128,12 @@ class TestCarData(unittest.TestCase):
   def test_today_and_battery_lead_the_first_row(self):
     keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
     items = [_Obj(key=k) for k in ("odometer", "rpm", "battery_12v", "today", "lead")]
-    assert keys(items) == ["today", "battery_12v", "odometer", "rpm", "lead"]
+    assert keys(items) == ["today", "battery_12v", "rpm", "lead", "odometer"]
 
   def test_order_with_missing_items(self):
     keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
     assert keys([_Obj(key="odometer"), _Obj(key="battery_12v")]) == ["battery_12v", "odometer"]
+    assert keys([_Obj(key="odometer"), _Obj(key="rpm")]) == ["rpm", "odometer"]
     assert keys([_Obj(key="odometer"), _Obj(key="today")]) == ["today", "odometer"]
     assert keys([]) == []
 
@@ -158,11 +159,11 @@ class TestCarData(unittest.TestCase):
     assert sum(i.key == "rpm" for i in items) == 1
 
   def test_standard_order_and_experimental_tiles_last(self):
-    keys = ["watch_3", "tire_pressure_guess", "extra", "friction_brake_force", "rpm", "lead_distance", "odometer", "battery_12v", "today",
-            "watch_1"]
+    keys = ["watch_3", "tire_pressure_guess", "extra", "friction_brake_force", "engine_temp", "rpm", "lead_distance", "odometer",
+            "battery_12v", "today", "watch_1"]
     ordered = [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])]
-    assert ordered == ["today", "battery_12v", "odometer", "rpm", "lead_distance", "friction_brake_force", "extra",
-                       "watch_3", "tire_pressure_guess", "watch_1"]
+    assert ordered == ["today", "battery_12v", "rpm", "engine_temp", "lead_distance", "friction_brake_force", "extra",
+                       "odometer", "watch_3", "tire_pressure_guess", "watch_1"]
 
   def test_lead_distance_and_friction_brake_are_on_the_page(self):
     sm = _SM([_Obj(key="lead_distance", label="Lead distance", value=23.0, unit="m", valid=True)])
