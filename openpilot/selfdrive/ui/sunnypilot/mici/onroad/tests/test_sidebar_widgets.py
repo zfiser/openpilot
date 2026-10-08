@@ -82,49 +82,28 @@ class TestSidebarWidgets(unittest.TestCase):
     self.mod, self.ui_state, self.UIStatus = _load_sidebar()
     self.sidebar = self.mod.MiciSidebarWidgets(confidence_ball=None)
 
-  def test_no_icon_by_default(self):
+  def test_no_stop_light_by_default(self):
     self.ui_state.sm = _SM(lead_present=False, should_stop=False)
-    assert self.sidebar._indicator_reason() == "none"
+    assert not self.sidebar._stop_light_visible()
 
-  def test_lead(self):
-    self.ui_state.sm = _SM(lead_present=True, should_stop=False)
-    assert self.sidebar._indicator_reason() == "lead"
-
-  def test_stop_without_lead(self):
+  def test_stop_light_when_the_planner_stops_without_a_lead(self):
     self.ui_state.sm = _SM(lead_present=False, should_stop=True)
-    assert self.sidebar._indicator_reason() == "stop"
+    assert self.sidebar._stop_light_visible()
 
-  def test_lead_wins_over_stop(self):
-    # a stopped lead also sets shouldStop, the lead is the reason so no red light should be shown
+  def test_a_lead_car_hides_the_stop_light(self):
+    # a stopped lead also sets shouldStop, that is a car and not a red light
     self.ui_state.sm = _SM(lead_present=True, should_stop=True)
-    assert self.sidebar._indicator_reason() == "lead"
+    assert not self.sidebar._stop_light_visible()
 
   def test_stale_plan_ignored(self):
     # longitudinalPlan not received since the drive started
     self.ui_state.started_frame = 10
     self.ui_state.sm = _SM(lead_present=False, should_stop=True, plan_frame=5)
-    assert self.sidebar._indicator_reason() == "none"
+    assert not self.sidebar._stop_light_visible()
 
   def test_missing_messages_do_not_raise(self):
     self.ui_state.sm = _Obj(recv_frame={})
-    assert self.sidebar._indicator_reason() == "none"
-
-  def test_lead_distance_parts(self):
-    assert self.mod.lead_distance_parts(32.4, True) == ("32", "m")
-    assert self.mod.lead_distance_parts(32.6, True) == ("33", "m")
-    assert self.mod.lead_distance_parts(30.0, False) == ("98", "ft")
-
-  def test_lead_distance_with_lead(self):
-    self.ui_state.sm = _SM(lead_present=True, should_stop=False, d_rel=41.7)
-    assert abs(self.sidebar._lead_distance() - 41.7) < 1e-6
-
-  def test_lead_distance_without_lead(self):
-    self.ui_state.sm = _SM(lead_present=False, should_stop=False, d_rel=41.7)
-    assert self.sidebar._lead_distance() is None
-
-  def test_lead_distance_missing_message(self):
-    self.ui_state.sm = _Obj(recv_frame={})
-    assert self.sidebar._lead_distance() is None
+    assert not self.sidebar._stop_light_visible()
 
 
 if __name__ == "__main__":
