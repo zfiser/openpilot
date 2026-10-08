@@ -21,8 +21,8 @@ ONE_DECIMAL_KEYS = {"today"}  # the daily distance has tenths
 # The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
 # there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
 STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("rpm", "Engine RPM", "rpm"),
-                  ("engine_temp", "Engine temp", "C"), ("lead_distance", "Lead distance", "m"),
-                  ("friction_brake_force", "Friction brake", "N"), ("odometer", "Odometer", "km"))
+                  ("engine_temp", "Engine temp", "C"), ("odometer", "Odometer", "km"))
+HIDDEN_KEYS = {"lead_distance", "friction_brake_force"}  # drawn on the driving screen only, not looked at while driving
 LAST_USEFUL_KEY = "odometer"  # after everything else that is useful, before the experimental tiles
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
@@ -110,7 +110,7 @@ def get_items(sm) -> list:
   try:
     if sm.recv_frame["carStateSP"] < ui_state.started_frame:
       return []
-    return list(sm["carStateSP"].carData)
+    return [item for item in sm["carStateSP"].carData if item.key not in HIDDEN_KEYS]
   except Exception:
     return []
 

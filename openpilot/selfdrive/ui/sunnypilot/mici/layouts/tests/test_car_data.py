@@ -127,8 +127,8 @@ class TestCarData(unittest.TestCase):
 
   def test_today_and_battery_lead_the_first_row(self):
     keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
-    items = [_Obj(key=k) for k in ("odometer", "rpm", "battery_12v", "today", "lead")]
-    assert keys(items) == ["today", "battery_12v", "rpm", "lead", "odometer"]
+    items = [_Obj(key=k) for k in ("odometer", "rpm", "battery_12v", "today", "extra")]
+    assert keys(items) == ["today", "battery_12v", "rpm", "extra", "odometer"]
 
   def test_order_with_missing_items(self):
     keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
@@ -159,15 +159,16 @@ class TestCarData(unittest.TestCase):
     assert sum(i.key == "rpm" for i in items) == 1
 
   def test_standard_order_and_experimental_tiles_last(self):
-    keys = ["watch_3", "tire_pressure_guess", "extra", "friction_brake_force", "engine_temp", "rpm", "lead_distance", "odometer",
-            "battery_12v", "today", "watch_1"]
+    keys = ["watch_3", "tire_pressure_guess", "extra", "engine_temp", "rpm", "odometer", "battery_12v", "today", "watch_1"]
     ordered = [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])]
-    assert ordered == ["today", "battery_12v", "rpm", "engine_temp", "lead_distance", "friction_brake_force", "extra",
-                       "odometer", "watch_3", "tire_pressure_guess", "watch_1"]
+    assert ordered == ["today", "battery_12v", "rpm", "engine_temp", "extra", "odometer", "watch_3", "tire_pressure_guess", "watch_1"]
 
-  def test_lead_distance_and_friction_brake_are_on_the_page(self):
-    sm = _SM([_Obj(key="lead_distance", label="Lead distance", value=23.0, unit="m", valid=True)])
-    assert [i.key for i in self.mod.get_items(sm)] == ["lead_distance"]
+  def test_lead_distance_and_friction_brake_stay_off_the_page(self):
+    sm = _SM([_Obj(key="lead_distance", label="Lead distance", value=23.0, unit="m", valid=True),
+              _Obj(key="friction_brake_force", label="Friction brake", value=400.0, unit="N", valid=True),
+              _Obj(key="rpm", label="Engine RPM", value=1800.0, unit="rpm", valid=True)])
+    assert [i.key for i in self.mod.get_items(sm)] == ["rpm"]
+    assert not {"lead_distance", "friction_brake_force"} & {key for key, _, _ in self.mod.STANDARD_TILES}
 
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
