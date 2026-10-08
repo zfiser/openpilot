@@ -47,6 +47,7 @@ def _load():
       TextAlignment=mock.MagicMock(), TextAlignmentVertical=mock.MagicMock()),
     "openpilot.system.ui.widgets": _stub_module("openpilot.system.ui.widgets", Widget=_Widget),
     "openpilot.system.ui.widgets.label": _stub_module("openpilot.system.ui.widgets.label", UnifiedLabel=mock.MagicMock()),
+    "openpilot.system.ui.widgets.scroller": _stub_module("openpilot.system.ui.widgets.scroller", Scroller=_Widget),
   }
   with mock.patch.dict(sys.modules, stubs):
     spec = importlib.util.spec_from_file_location("car_data_under_test", MODULE_PATH)
@@ -82,6 +83,7 @@ class TestCarData(unittest.TestCase):
     state = {"date": "2026-10-08", "start": 10000.0, "unit": "km", "last": 10042.0}
     odometer, today = self.mod.stored_items(state, "2026-10-08")
     assert (odometer.key, odometer.value, odometer.unit, odometer.valid) == ("odometer", 10042.0, "km", True)
+    assert odometer.label == "Odometer (last known)" and today.label == "Today (last known)"
     assert (today.key, today.value, today.unit, today.valid) == ("today", 42.0, "km", True)
 
   def test_stored_items_a_new_day_starts_at_zero(self):
@@ -114,17 +116,10 @@ class TestCarData(unittest.TestCase):
     assert self.mod.voltage_item(SMV(alive={}, ps=_Obj(voltage=12640))) is None
     assert self.mod.voltage_item(_Obj()) is None
 
-  def test_tile_columns(self):
-    assert [self.mod.tile_columns(n) for n in (1, 4, 5, 9, 10, 12)] == [2, 2, 3, 3, 4, 4]
-
-  def test_tile_text_sizes_fit_and_shrink(self):
-    big = self.mod.tile_text_sizes(80, 2, 1.0)
-    small = self.mod.tile_text_sizes(48, 3, 1.0)
-    assert big[0] <= 17 and big[1] <= 34
-    assert small[0] < big[0] or small[1] < big[1]
-    for columns in (2, 3, 4):
-      label, value = self.mod.tile_text_sizes(40, columns, 1.0)
-      assert label * 1.3 + value * 1.2 <= 40 + 12  # label row plus value row stay about tile height
+  def test_rows_of(self):
+    assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
+    assert self.mod.rows_of([]) == []
+    assert self.mod.rows_of([1]) == [[1]]
 
   def test_items_returned(self):
     items = [_Obj(key="odometer"), _Obj(key="fuel")]

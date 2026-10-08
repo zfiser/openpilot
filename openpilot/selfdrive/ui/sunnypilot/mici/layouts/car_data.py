@@ -14,14 +14,17 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
+from openpilot.system.ui.widgets.scroller import Scroller
 
-MAX_ITEMS_TWO_COLUMNS = 4  # up to this many tiles use two columns, up to nine use three, more use four
-MAX_ITEMS_THREE_COLUMNS = 9
+COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)
 LABEL_COLOR = rl.Color(255, 255, 255, 140)
 VALUE_COLOR = rl.Color(255, 255, 255, 255)
 EMPTY_COLOR = rl.Color(255, 255, 255, 110)
 REFERENCE_HEIGHT = 240  # font sizes below are tuned for this screen height
+TILE_HEIGHT_RATIO = 0.33  # of the screen height, two rows of tiles fit below the title
+TITLE_HEIGHT_RATIO = 0.16
+PAD_RATIO = 0.06
 
 
 def format_value(value: float, unit: str, valid: bool) -> str:
@@ -32,16 +35,8 @@ def format_value(value: float, unit: str, valid: bool) -> str:
   return f"{text} {unit}".rstrip()
 
 
-def tile_columns(count: int) -> int:
-  return 2 if count <= MAX_ITEMS_TWO_COLUMNS else 3 if count <= MAX_ITEMS_THREE_COLUMNS else 4
-
-
-def tile_text_sizes(tile_height: float, columns: int, scale: float) -> tuple[int, int]:
-  """(label, value) font sizes: follow the tile height, but narrower tiles (more columns) cap the value size."""
-  value_cap = {2: 34, 3: 25, 4: 20}[columns] * scale
-  label = int(min(17 * scale, max(11 * scale, tile_height * 0.22)))
-  value = int(min(value_cap, max(14 * scale, tile_height * 0.42)))
-  return label, value
+def rows_of(items: list, columns: int = COLUMNS) -> list[list]:
+  return [items[i:i + columns] for i in range(0, len(items), columns)]
 
 
 def stored_items(state, today: str) -> list:
@@ -54,8 +49,9 @@ def stored_items(state, today: str) -> list:
     same_day = state.get("date") in (None, today)
   except Exception:
     return []
-  return [SimpleNamespace(key="odometer", label="Odometer", value=last, unit=unit, valid=True),
-          SimpleNamespace(key="today", label="Today", value=max(last - start, 0.0) if same_day else 0.0, unit=unit, valid=True)]
+  return [SimpleNamespace(key="odometer", label="Odometer (last known)", value=last, unit=unit, valid=True),
+          SimpleNamespace(key="today", label="Today (last known)", value=max(last - start, 0.0) if same_day else 0.0,
+                          unit=unit, valid=True)]
 
 
 def voltage_item(sm):
@@ -82,19 +78,76 @@ def get_items(sm) -> list:
     return []
 
 
-class MiciCarDataLayout(Widget):
-  """Swipe page listing whatever extra car data the brand specific car state extension reports."""
+class _TitleRow(Widget):
+  def __init__(self, width: float, height: float, pad: float, scale: float):
+    super().__init__()
+    self.set_rect(rl.Rectangle(0, 0, width, height))
+    self._label = UnifiedLabel("car data", int(26 * scale), FontWeight.SEMI_BOLD, LABEL_COLOR)
+    self._pad = pad
+
+  def _render(self, rect: rl.Rectangle) -> None:
+    self._label.render(rl.Rectangle(rect.x + self._pad * 0.5, rect.y, rect.width - self._pad, rect.height))
+
+
+class _TileRow(Widget):
+  """A fixed size row with up to two tiles, the fonts do not shrink when there are many rows."""
+
+  def __init__(self, width: float, height: float, pad: float, scale: float, label_cache: dict):
+    super().__init__()
+    self.set_rect(rl.Rectangle(0, 0, width, height))
+    self._pad = pad
+    self._label_size = int(17 * scale)
+    self._value_size = int(34 * scale)
+    self._cache = label_cache
+    self._items: list = []
+
+  def set_items(self, items: list) -> None:
+    self._items = items
+
+  def _labels(self, key: str) -> tuple[UnifiedLabel, UnifiedLabel]:
+    if key not in self._cache:
+      self._cache[key] = (UnifiedLabel("", self._label_size, FontWeight.MEDIUM, LABEL_COLOR, wrap_text=False),
+                          UnifiedLabel("", self._value_size, FontWeight.BOLD, VALUE_COLOR, wrap_text=False))
+    return self._cache[key]
+
+  def _render(self, rect: rl.Rectangle) -> None:
+    pad = self._pad
+    tile_w = (rect.width - pad * (COLUMNS + 1)) / COLUMNS
+    inner = pad * 1.2
+    label_h = self._label_size * 1.3
+    for col, item in enumerate(self._items):
+      tile = rl.Rectangle(rect.x + pad + col * (tile_w + pad), rect.y, tile_w, rect.height)
+      rl.draw_rectangle_rounded(tile, 0.18, 8, TILE_COLOR)
+
+      label, value = self._labels(item.key)
+      label.set_text(item.label)
+      value.set_text(format_value(item.value, item.unit, item.valid))
+      label.render(rl.Rectangle(tile.x + inner, tile.y + inner * 0.5, tile.width - inner * 2, label_h))
+      value_y = tile.y + inner * 0.5 + label_h
+      value.render(rl.Rectangle(tile.x + inner, value_y, tile.width - inner * 2, tile.y + tile.height - value_y))
+
+
+class MiciCarDataLayout(Scroller):
+  """Swipe page listing whatever extra car data the brand specific car state extension reports. Tiles keep their size,
+  more tiles than fit make the page scroll vertically."""
 
   def __init__(self):
-    super().__init__()
-    scale = gui_app.height / REFERENCE_HEIGHT
-    self._title = UnifiedLabel("car data", int(26 * scale), FontWeight.SEMI_BOLD, LABEL_COLOR)
-    self._empty = UnifiedLabel("no car data available", int(30 * scale), FontWeight.MEDIUM, EMPTY_COLOR,
+    height = gui_app.height
+    self._width = gui_app.width
+    self._scale = height / REFERENCE_HEIGHT
+    self._pad = height * PAD_RATIO
+    self._tile_height = height * TILE_HEIGHT_RATIO
+    super().__init__(horizontal=False, spacing=int(self._pad), pad=int(self._pad), scroll_indicator=False, edge_shadows=False)
+
+    self._empty = UnifiedLabel("no car data available", int(30 * self._scale), FontWeight.MEDIUM, EMPTY_COLOR,
                                alignment=TextAlignment.CENTER, alignment_vertical=TextAlignmentVertical.MIDDLE)
-    self._scale = scale
+    self._title = _TitleRow(self._width, height * TITLE_HEIGHT_RATIO, self._pad, self._scale)
+    self._scroller.add_widget(self._title)
+    self._rows: list[_TileRow] = []
+    self._label_cache: dict = {}
+    self._has_items = False
     self._stored: list = []
     self._stored_time = -10.0
-    self._tiles: dict[tuple[str, int, int], tuple[UnifiedLabel, UnifiedLabel]] = {}
 
   def _stored_items(self) -> list:
     if time.monotonic() - self._stored_time > 2.0:
@@ -105,45 +158,25 @@ class MiciCarDataLayout(Widget):
         self._stored = []
     return self._stored
 
-  def _tile_labels(self, key: str, label_size: int, value_size: int) -> tuple[UnifiedLabel, UnifiedLabel]:
-    if (key, label_size, value_size) not in self._tiles:
-      self._tiles[(key, label_size, value_size)] = (
-        UnifiedLabel("", label_size, FontWeight.MEDIUM, LABEL_COLOR, wrap_text=False),
-        UnifiedLabel("", value_size, FontWeight.BOLD, VALUE_COLOR, wrap_text=False),
-      )
-    return self._tiles[(key, label_size, value_size)]
-
-  def _render(self, rect: rl.Rectangle) -> None:
-    rl.draw_rectangle_rec(rect, rl.BLACK)
-    pad = rect.height * 0.06
-
-    title_height = rect.height * 0.16
-    self._title.render(rl.Rectangle(rect.x + pad * 1.5, rect.y + pad, rect.width - pad * 3, title_height))
-
+  def _update_state(self) -> None:
     items = get_items(ui_state.sm) or self._stored_items()
     if (battery := voltage_item(ui_state.sm)) is not None:
       items = [*items, battery]
-    if not items:
-      self._empty.render(rl.Rectangle(rect.x, rect.y + title_height, rect.width, rect.height - title_height))
+    self._has_items = bool(items)
+
+    rows = rows_of(items)
+    while len(self._rows) < len(rows):
+      row = _TileRow(self._width, self._tile_height, self._pad, self._scale, self._label_cache)
+      self._rows.append(row)
+      self._scroller.add_widget(row)
+    while len(self._rows) > len(rows):
+      self._scroller.items.remove(self._rows.pop())
+    for row, chunk in zip(self._rows, rows, strict=True):
+      row.set_items(chunk)
+
+  def _render(self, rect: rl.Rectangle) -> None:
+    rl.draw_rectangle_rec(rect, rl.BLACK)
+    if not self._has_items:
+      self._empty.render(rect)
       return
-
-    top = rect.y + pad + title_height
-    columns = tile_columns(len(items))
-    rows = (len(items) + columns - 1) // columns
-    tile_w = (rect.width - pad * (columns + 1)) / columns
-    tile_h = min((rect.y + rect.height - top - pad * rows) / rows, rect.height * 0.34)
-    label_size, value_size = tile_text_sizes(tile_h, columns, self._scale)
-
-    for idx, item in enumerate(items):
-      col, row = idx % columns, idx // columns
-      tile = rl.Rectangle(rect.x + pad + col * (tile_w + pad), top + row * (tile_h + pad), tile_w, tile_h)
-      rl.draw_rectangle_rounded(tile, 0.18, 8, TILE_COLOR)
-
-      label, value = self._tile_labels(item.key, label_size, value_size)
-      label.set_text(item.label)
-      value.set_text(format_value(item.value, item.unit, item.valid))
-      inner = pad * 1.2 if columns < 4 else pad * 0.8
-      label_h = label_size * 1.3
-      label.render(rl.Rectangle(tile.x + inner, tile.y + inner * 0.5, tile.width - inner * 2, label_h))
-      value_y = tile.y + inner * 0.5 + label_h
-      value.render(rl.Rectangle(tile.x + inner, value_y, tile.width - inner * 2, tile.y + tile.height - value_y))
+    self._scroller.render(rect)
