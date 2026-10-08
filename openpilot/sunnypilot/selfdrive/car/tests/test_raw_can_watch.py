@@ -85,7 +85,7 @@ class TestParse:
       assert parse_watches(config) == []
 
   def test_limit(self):
-    assert len(parse_watches([watch() for _ in range(50)])) == 12
+    assert len(parse_watches([watch() for _ in range(50)])) == 32
 
 
 class TestRawCanWatch:

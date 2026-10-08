@@ -10,7 +10,7 @@ from collections.abc import Callable
 from opendbc.sunnypilot.car.car_data import make_car_data_item
 
 PARAM = "RawCanWatch"
-MAX_WATCHES = 12
+MAX_WATCHES = 32
 RELOAD_SECONDS = 2.0
 
 
