@@ -17,6 +17,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import Scroller
 
 CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goes back, used while the global timeout is on its default
+HIDDEN_KEYS = {"lead_distance"}  # shown on the road view instead
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)
 LABEL_COLOR = rl.Color(255, 255, 255, 140)
@@ -80,7 +81,7 @@ def get_items(sm) -> list:
   try:
     if sm.recv_frame["carStateSP"] < ui_state.started_frame:
       return []
-    return list(sm["carStateSP"].carData)
+    return [item for item in sm["carStateSP"].carData if item.key not in HIDDEN_KEYS]
   except Exception:
     return []
 

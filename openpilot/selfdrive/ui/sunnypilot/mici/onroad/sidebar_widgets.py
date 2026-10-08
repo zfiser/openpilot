@@ -4,10 +4,13 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+import time
+
 import pyray as rl
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed import gps_speed
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance import CLOSING, OPENING, LeadTrend, lead_distance
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -16,8 +19,12 @@ from openpilot.system.ui.widgets import Widget
 WHITE = rl.Color(255, 255, 255, 255)
 BLACK = rl.Color(0, 0, 0, 255)
 TRAFFIC_RED = rl.Color(200, 32, 48, 255)
+LEAD_CLOSING = rl.Color(255, 64, 64, 255)
+LEAD_OPENING = rl.Color(64, 220, 96, 255)
 SPEED_FONT_SIZE = 56  # digits a bit taller than the 50 px icons, three digits spill left over the road view
 SPEED_RIGHT_MARGIN = 10
+LEAD_FONT_SIZE = 32  # small, sits right above the GPS speed
+LEAD_GAP = 0
 SPEED_BOTTOM_MARGIN = 10  # the text box has some padding below the digits, this lines them up with the wheel icon
 
 
@@ -29,6 +36,7 @@ class MiciSidebarWidgets(Widget):
     super().__init__()
     self._confidence_ball = confidence_ball
     self._speed_font = gui_app.font(FontWeight.BOLD)
+    self._lead_trend = LeadTrend()
 
   def _render(self, rect: rl.Rectangle) -> None:
     sidebar = rl.Rectangle(
@@ -47,6 +55,7 @@ class MiciSidebarWidgets(Widget):
     if self._stop_light_visible():
       self._draw_stop_light_icon(indicator_slot)
     self._draw_gps_speed(rect)
+    self._draw_lead_distance(rect)
 
   def _draw_gps_speed(self, rect: rl.Rectangle) -> None:
     """Right aligned in the bottom right corner of the screen, a number without a unit."""
@@ -57,6 +66,20 @@ class MiciSidebarWidgets(Widget):
     measured = measure_text_cached(self._speed_font, text, SPEED_FONT_SIZE)
     pos = rl.Vector2(rect.x + rect.width - SPEED_RIGHT_MARGIN - measured.x, rect.y + rect.height - SPEED_BOTTOM_MARGIN - measured.y)
     rl.draw_text_ex(self._speed_font, text, pos, SPEED_FONT_SIZE, 0, WHITE)
+
+  def _draw_lead_distance(self, rect: rl.Rectangle) -> None:
+    """Metres to the lead above the GPS speed, red while the gap shrinks, green while it grows."""
+    distance = lead_distance(ui_state.sm, ui_state.started_frame)
+    trend = self._lead_trend.update(distance, time.monotonic())
+    if distance is None:
+      return
+    color = LEAD_CLOSING if trend == CLOSING else LEAD_OPENING if trend == OPENING else WHITE
+    text = str(distance)
+    measured = measure_text_cached(self._speed_font, text, LEAD_FONT_SIZE)
+    speed_height = measure_text_cached(self._speed_font, "0", SPEED_FONT_SIZE).y
+    pos = rl.Vector2(rect.x + rect.width - SPEED_RIGHT_MARGIN - measured.x,
+                     rect.y + rect.height - SPEED_BOTTOM_MARGIN - speed_height - LEAD_GAP - measured.y)
+    rl.draw_text_ex(self._speed_font, text, pos, LEAD_FONT_SIZE, 0, color)
 
   def _stop_light_visible(self) -> bool:
     # a stopped lead car also sets shouldStop, that is a car and not a red light, so a lead hides the icon

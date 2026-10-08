@@ -61,6 +61,9 @@ def _load_sidebar():
     "openpilot.system.ui.lib.text_measure": _stub_module("openpilot.system.ui.lib.text_measure", measure_text_cached=mock.MagicMock()),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed": _stub_module(
       "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed", gps_speed=mock.MagicMock(return_value=None)),
+    "openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance": _stub_module(
+      "openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance", CLOSING=-1, OPENING=1, LeadTrend=mock.MagicMock(),
+      lead_distance=mock.MagicMock(return_value=None)),
     "openpilot.selfdrive.ui.sunnypilot": _stub_module("openpilot.selfdrive.ui.sunnypilot"),
     "openpilot.selfdrive.ui.sunnypilot.mici": _stub_module("openpilot.selfdrive.ui.sunnypilot.mici"),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad": _stub_module("openpilot.selfdrive.ui.sunnypilot.mici.onroad"),
