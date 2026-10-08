@@ -78,6 +78,25 @@ class TestCarData(unittest.TestCase):
   def test_format_no_unit(self):
     assert self.mod.format_value(7.0, "", True) == "7"
 
+  def test_stored_items_same_day(self):
+    state = {"date": "2026-10-08", "start": 10000.0, "unit": "km", "last": 10042.0}
+    odometer, today = self.mod.stored_items(state, "2026-10-08")
+    assert (odometer.key, odometer.value, odometer.unit, odometer.valid) == ("odometer", 10042.0, "km", True)
+    assert (today.key, today.value, today.unit, today.valid) == ("today", 42.0, "km", True)
+
+  def test_stored_items_a_new_day_starts_at_zero(self):
+    state = {"date": "2026-10-07", "start": 10000.0, "unit": "mi", "last": 10042.0}
+    odometer, today = self.mod.stored_items(state, "2026-10-08")
+    assert odometer.value == 10042.0 and today.value == 0.0 and today.unit == "mi"
+
+  def test_stored_items_unknown_date_counts_as_today_and_old_format_works(self):
+    assert self.mod.stored_items({"date": None, "start": 5.0, "unit": "km", "last": 9.0}, "2026-10-08")[1].value == 4.0
+    assert self.mod.stored_items({"date": "2026-10-08", "start": 5.0, "unit": "km"}, "2026-10-08")[1].value == 0.0
+
+  def test_stored_items_garbage(self):
+    for bad in (None, "x", 5, {}, {"start": "a", "unit": "km"}):
+      assert self.mod.stored_items(bad, "2026-10-08") == []
+
   def test_tile_columns(self):
     assert [self.mod.tile_columns(n) for n in (1, 4, 5, 9, 10, 12)] == [2, 2, 3, 3, 4, 4]
 

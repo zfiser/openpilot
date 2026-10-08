@@ -4,6 +4,10 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+import datetime
+import time
+from types import SimpleNamespace
+
 import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -40,6 +44,20 @@ def tile_text_sizes(tile_height: float, columns: int, scale: float) -> tuple[int
   return label, value
 
 
+def stored_items(state, today: str) -> list:
+  """Last known odometer and the distance of today from the stored DailyOdometer, shown while the car is off.
+  A stored day that is not today means nothing was driven yet today."""
+  try:
+    start = float(state["start"])
+    last = float(state.get("last", start))
+    unit = str(state["unit"])
+    same_day = state.get("date") in (None, today)
+  except Exception:
+    return []
+  return [SimpleNamespace(key="odometer", label="Odometer", value=last, unit=unit, valid=True),
+          SimpleNamespace(key="today", label="Today", value=max(last - start, 0.0) if same_day else 0.0, unit=unit, valid=True)]
+
+
 def get_items(sm) -> list:
   """Car data items from carStateSP, empty until the message of the current drive has been received."""
   try:
@@ -60,7 +78,18 @@ class MiciCarDataLayout(Widget):
     self._empty = UnifiedLabel("no car data available", int(30 * scale), FontWeight.MEDIUM, EMPTY_COLOR,
                                alignment=TextAlignment.CENTER, alignment_vertical=TextAlignmentVertical.MIDDLE)
     self._scale = scale
+    self._stored: list = []
+    self._stored_time = -10.0
     self._tiles: dict[tuple[str, int, int], tuple[UnifiedLabel, UnifiedLabel]] = {}
+
+  def _stored_items(self) -> list:
+    if time.monotonic() - self._stored_time > 2.0:
+      self._stored_time = time.monotonic()
+      try:
+        self._stored = stored_items(ui_state.params.get("DailyOdometer"), datetime.date.today().isoformat())
+      except Exception:
+        self._stored = []
+    return self._stored
 
   def _tile_labels(self, key: str, label_size: int, value_size: int) -> tuple[UnifiedLabel, UnifiedLabel]:
     if (key, label_size, value_size) not in self._tiles:
@@ -77,7 +106,7 @@ class MiciCarDataLayout(Widget):
     title_height = rect.height * 0.16
     self._title.render(rl.Rectangle(rect.x + pad * 1.5, rect.y + pad, rect.width - pad * 3, title_height))
 
-    items = get_items(ui_state.sm)
+    items = get_items(ui_state.sm) or self._stored_items()
     if not items:
       self._empty.render(rl.Rectangle(rect.x, rect.y + title_height, rect.width, rect.height - title_height))
       return

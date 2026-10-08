@@ -16,6 +16,7 @@ if gui_app.sunnypilot_ui():
   from openpilot.selfdrive.ui.sunnypilot.mici.layouts.car_data import MiciCarDataLayout
 
 ONROAD_DELAY = 2.5  # seconds
+CAR_DATA_TIMEOUT = 15  # seconds without touching the car data page before the screen goes back to the road view
 
 
 class MiciMainLayout(Scroller):
@@ -23,6 +24,7 @@ class MiciMainLayout(Scroller):
     super().__init__(snap_items=True, spacing=0, pad=0, scroll_indicator=False, edge_shadows=False)
 
     self._prev_onroad = False
+    self._car_data_in_view = False
     self._prev_standstill = False
     self._onroad_time_delay: float | None = None
     self._setup = False
@@ -104,7 +106,19 @@ class MiciMainLayout(Scroller):
     # Render
     super()._render(self._rect)
 
+  def _update_car_data_timeout(self) -> None:
+    """The car data page gets a longer interactive timeout than the default 5 s while driving. The scroller does not
+    update pages that are off screen, so the page position is checked here."""
+    if self._car_data_layout is None:
+      return
+    in_view = abs(self._car_data_layout.rect.x - self._rect.x) < self._rect.width / 2  # more than half of the page is on screen
+    if in_view != self._car_data_in_view:
+      self._car_data_in_view = in_view
+      device.set_override_interactive_timeout(CAR_DATA_TIMEOUT if in_view else None)
+
   def _handle_transitions(self):
+    self._update_car_data_timeout()
+
     # Don't pop if onboarding
     if gui_app.widget_in_stack(self._onboarding_window):
       return
