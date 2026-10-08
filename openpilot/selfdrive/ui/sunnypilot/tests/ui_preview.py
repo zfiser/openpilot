@@ -32,7 +32,8 @@ SCENARIOS = {
                                                                        ("rpm", "Engine RPM", 1800.0, "rpm", True)]),
   rl.KeyboardKey.KEY_TWO: ("lead car", True, False, True, [("odometer", "Odometer", 54321.0, "km", True),
                                                            ("today", "Today", 42.0, "km", True),
-                                                           ("rpm", "Engine RPM", 1800.0, "rpm", True)]),
+                                                           ("rpm", "Engine RPM", 1800.0, "rpm", True),
+                                                           ("lead_distance", "Lead distance", 23.0, "m", True)]),
   rl.KeyboardKey.KEY_THREE: ("stop light, engine off", False, True, True, [("odometer", "Odometer", 54321.0, "km", True),
                                                                            ("rpm", "Engine RPM", 0.0, "rpm", True)]),
   rl.KeyboardKey.KEY_FOUR: ("disengaged, car data missing", False, False, False, [("odometer", "Odometer", 0.0, "km", False),
@@ -54,7 +55,7 @@ def animate_item(item, t: float):
   if key == "rpm" and value == 0.0:
     return item  # engine off stays off
   wobble = {"odometer": 0.0, "rpm": 600.0 * math.sin(t * 0.8),
-            "hv": 3.0 * math.sin(t * 0.2),
+            "hv": 3.0 * math.sin(t * 0.2), "lead_distance": 8.0 * math.sin(t * 0.6),  # gap shrinks and grows, shows both trend colours
             "tire_pressure_guess": 1.5 * math.sin(t * 0.2), "tire_temperature_guess": 1.0 * math.sin(t * 0.15)}.get(key, 0.0)
   return key, label, value + wobble + (t * 0.01 if key == "odometer" else 0.0), unit, valid
 
