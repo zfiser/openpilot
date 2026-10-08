@@ -16,8 +16,9 @@ from openpilot.system.ui.widgets import Widget
 WHITE = rl.Color(255, 255, 255, 255)
 BLACK = rl.Color(0, 0, 0, 255)
 TRAFFIC_RED = rl.Color(200, 32, 48, 255)
-SPEED_FONT_SIZES = (34, 30, 26, 22)  # biggest that fits the sidebar width, a bit bigger than the icons
-SPEED_BOTTOM_MARGIN = 14  # same distance from the bottom edge as the steering wheel icon
+SPEED_FONT_SIZE = 56  # digits a bit taller than the 50 px icons, three digits spill left over the road view
+SPEED_RIGHT_MARGIN = 10
+SPEED_BOTTOM_MARGIN = 10  # the text box has some padding below the digits, this lines them up with the wheel icon
 
 
 class MiciSidebarWidgets(Widget):
@@ -45,19 +46,17 @@ class MiciSidebarWidgets(Widget):
     self._confidence_ball.render_static(confidence_slot, max(16, min(20, int(slot_height * 0.28))))
     if self._stop_light_visible():
       self._draw_stop_light_icon(indicator_slot)
-    self._draw_gps_speed(sidebar)
+    self._draw_gps_speed(rect)
 
-  def _draw_gps_speed(self, sidebar: rl.Rectangle) -> None:
+  def _draw_gps_speed(self, rect: rl.Rectangle) -> None:
+    """Right aligned in the bottom right corner of the screen, a number without a unit."""
     speed = gps_speed(ui_state.sm, ui_state.is_metric)
     if speed is None:
       return
     text = str(speed)
-    for size in SPEED_FONT_SIZES:
-      measured = measure_text_cached(self._speed_font, text, size)
-      if measured.x <= sidebar.width - 6:
-        break
-    pos = rl.Vector2(sidebar.x + (sidebar.width - measured.x) / 2, sidebar.y + sidebar.height - SPEED_BOTTOM_MARGIN - measured.y)
-    rl.draw_text_ex(self._speed_font, text, pos, size, 0, WHITE)
+    measured = measure_text_cached(self._speed_font, text, SPEED_FONT_SIZE)
+    pos = rl.Vector2(rect.x + rect.width - SPEED_RIGHT_MARGIN - measured.x, rect.y + rect.height - SPEED_BOTTOM_MARGIN - measured.y)
+    rl.draw_text_ex(self._speed_font, text, pos, SPEED_FONT_SIZE, 0, WHITE)
 
   def _stop_light_visible(self) -> bool:
     # a stopped lead car also sets shouldStop, that is a car and not a red light, so a lead hides the icon
