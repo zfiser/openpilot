@@ -18,8 +18,11 @@ from openpilot.system.ui.widgets.scroller import Scroller
 
 CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goes back, used while the global timeout is on its default
 ONE_DECIMAL_KEYS = {"today"}  # the daily distance has tenths
-FIRST_KEYS = ("today", "battery_12v")  # the first row of the page
-HIDDEN_KEYS = {"lead_distance", "friction_brake_force"}  # shown on the road view instead
+# The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
+# there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
+STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("odometer", "Odometer", "km"),
+                  ("rpm", "Engine RPM", "rpm"), ("lead_distance", "Lead distance", "m"), ("friction_brake_force", "Friction brake", "N"))
+EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)
 LABEL_COLOR = rl.Color(255, 255, 255, 140)
@@ -48,10 +51,22 @@ def format_value(value: float, unit: str, valid: bool, decimals: int | None = No
   return f"{text} {unit}".rstrip()
 
 
+def complete_items(items: list) -> list:
+  """The items plus a tile without a value for every standard tile that has none."""
+  have = {i.key for i in items}
+  missing = [SimpleNamespace(key=key, label=label, value=0.0, unit=unit, valid=False)
+             for key, label, unit in STANDARD_TILES if key not in have]
+  return [*items, *missing]
+
+
 def order_items(items: list) -> list:
-  """'Today' first and the 12 V battery second, so they are the first row; everything else keeps its order."""
-  first = [next((i for i in items if i.key == key), None) for key in FIRST_KEYS]
-  return [i for i in first if i is not None] + [i for i in items if i.key not in FIRST_KEYS]
+  """Standard tiles first in their fixed order (so 'today' and the 12 V battery are the first row), then whatever else the
+  car reports, the experimental tiles last."""
+  standard_keys = [key for key, _, _ in STANDARD_TILES]
+  standard = [next(i for i in items if i.key == key) for key in standard_keys if any(i.key == key for i in items)]
+  experimental = [i for i in items if i.key.startswith(EXPERIMENTAL_PREFIXES)]
+  other = [i for i in items if i.key not in standard_keys and not i.key.startswith(EXPERIMENTAL_PREFIXES)]
+  return standard + other + experimental
 
 
 def rows_of(items: list, columns: int = COLUMNS) -> list[list]:
@@ -92,7 +107,7 @@ def get_items(sm) -> list:
   try:
     if sm.recv_frame["carStateSP"] < ui_state.started_frame:
       return []
-    return [item for item in sm["carStateSP"].carData if item.key not in HIDDEN_KEYS]
+    return list(sm["carStateSP"].carData)
   except Exception:
     return []
 
@@ -170,7 +185,7 @@ class MiciCarDataLayout(Scroller):
     items = get_items(ui_state.sm) or self._stored_items()
     if (battery := voltage_item(ui_state.sm)) is not None:
       items = [*items, battery]
-    items = order_items(items)
+    items = order_items(complete_items(items))
     self._has_items = bool(items)
 
     rows = rows_of(items)

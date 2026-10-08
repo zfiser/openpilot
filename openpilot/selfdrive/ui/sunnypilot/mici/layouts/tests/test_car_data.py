@@ -146,6 +146,28 @@ class TestCarData(unittest.TestCase):
     items = {i.key: i for i in self.mod.stored_items({"start": 100.0, "last": 105.0, "unit": "km", "today": 4.6, "date": None}, "2026-10-08")}
     assert items["today"].value == 4.6
 
+  def test_every_standard_tile_is_there_even_without_data(self):
+    items = self.mod.complete_items([])
+    assert [i.key for i in items] == [key for key, _, _ in self.mod.STANDARD_TILES]
+    assert not any(i.valid for i in items)
+
+  def test_complete_keeps_real_items_and_only_adds_the_missing_ones(self):
+    real = _Obj(key="rpm", label="Engine RPM", value=1800.0, unit="rpm", valid=True)
+    items = self.mod.complete_items([real])
+    assert items[0] is real and len(items) == len(self.mod.STANDARD_TILES)
+    assert sum(i.key == "rpm" for i in items) == 1
+
+  def test_standard_order_and_experimental_tiles_last(self):
+    keys = ["watch_3", "tire_pressure_guess", "extra", "friction_brake_force", "rpm", "lead_distance", "odometer", "battery_12v", "today",
+            "watch_1"]
+    ordered = [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])]
+    assert ordered == ["today", "battery_12v", "odometer", "rpm", "lead_distance", "friction_brake_force", "extra",
+                       "watch_3", "tire_pressure_guess", "watch_1"]
+
+  def test_lead_distance_and_friction_brake_are_on_the_page(self):
+    sm = _SM([_Obj(key="lead_distance", label="Lead distance", value=23.0, unit="m", valid=True)])
+    assert [i.key for i in self.mod.get_items(sm)] == ["lead_distance"]
+
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []
