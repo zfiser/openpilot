@@ -197,8 +197,10 @@ class TestDailyDistanceTenths:
   def test_stored_value_for_the_page_follows_in_tenths(self):
     dd, params, mono = make_moving()
     dd.update(odo(10000), 0.0)
+    mono.t += 61.0  # the first write at the baseline starts the minute
+    dd.update(odo(10000), 0.0)
     drive(dd, mono, 10000, 450)
-    assert abs(params.values[PARAM]["today"] - 0.4) < 0.11
+    assert abs(params.values[PARAM]["today"] - 0.1) < 0.11  # written at the first tenth after the minute, the rest waits another minute
 
   def test_restart_keeps_the_anchor(self):
     dd, params, mono = make_moving()
@@ -226,6 +228,8 @@ class TestDailyDistanceTenths:
   def test_tenths_are_written_once_a_minute_without_waiting(self):
     dd, params, mono = make_moving()
     dd.update(odo(10000), 0.0)
+    mono.t += 61.0  # the first write at the baseline starts the minute
+    dd.update(odo(10000), 0.0)
     params.writes = params.async_writes = 0
     drive(dd, mono, 10000, 300)  # 15 s at 20 m/s, 0.3 km: the first tenth is written at once, the rest waits a minute
     assert params.async_writes == 1 and params.writes == 1
@@ -234,7 +238,7 @@ class TestDailyDistanceTenths:
     mono.t += 61.0
     dd.update(odo(10000), 20.0)
     assert params.async_writes == 2
-    assert 0.3 <= params.values[PARAM]["today"] <= 0.8
+    assert 0.7 <= params.values[PARAM]["today"] <= 0.9
 
   def test_a_tick_is_written_blocking_with_the_exact_tenths(self):
     dd, params, mono = make_moving()
