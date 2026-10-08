@@ -27,7 +27,7 @@ SPEED_RIGHT_MARGIN = 10
 LEAD_FONT_SIZE = 32  # small, sits right above the GPS speed
 LEAD_GAP = 0
 BRAKE_DOT_RADIUS = 5  # a 10 px dot
-BRAKE_DOT_GAP = 5  # above the lead distance text box
+BRAKE_DOT_GAP = 9  # between the dot and the GPS speed digits
 BRAKE_DOT_COLOR = rl.Color(255, 90, 0, 255)
 SPEED_BOTTOM_MARGIN = 10  # the text box has some padding below the digits, this lines them up with the wheel icon
 
@@ -41,6 +41,8 @@ class MiciSidebarWidgets(Widget):
     self._confidence_ball = confidence_ball
     self._speed_font = gui_app.font(FontWeight.BOLD)
     self._lead_trend = LeadTrend()
+    self._speed_left = 0.0  # left edge and vertical centre of the GPS speed digits, where the brake dot goes next to
+    self._speed_center_y = 0.0
 
   def _render(self, rect: rl.Rectangle) -> None:
     sidebar = rl.Rectangle(
@@ -65,11 +67,13 @@ class MiciSidebarWidgets(Widget):
   def _draw_gps_speed(self, rect: rl.Rectangle) -> None:
     """Right aligned in the bottom right corner of the screen, a number without a unit."""
     speed = gps_speed(ui_state.sm, ui_state.is_metric)
-    if speed is None:
-      return
-    text = str(speed)
+    text = str(speed) if speed is not None else "0"  # the dot keeps its place without a GPS fix
     measured = measure_text_cached(self._speed_font, text, SPEED_FONT_SIZE)
     pos = rl.Vector2(rect.x + rect.width - SPEED_RIGHT_MARGIN - measured.x, rect.y + rect.height - SPEED_BOTTOM_MARGIN - measured.y)
+    self._speed_left = pos.x
+    self._speed_center_y = pos.y + measured.y * 0.55
+    if speed is None:
+      return
     rl.draw_text_ex(self._speed_font, text, pos, SPEED_FONT_SIZE, 0, WHITE)
 
   def _draw_lead_distance(self, rect: rl.Rectangle) -> None:
@@ -87,14 +91,11 @@ class MiciSidebarWidgets(Widget):
     rl.draw_text_ex(self._speed_font, text, pos, LEAD_FONT_SIZE, 0, color)
 
   def _draw_brake_dot(self, rect: rl.Rectangle) -> None:
-    """A tiny dot at the right edge, above the lead distance, while the friction brakes (not regen) are slowing the car."""
+    """A dot left of the GPS speed digits while the friction brakes (not regen) are slowing the car. It is kept out of the
+    middle of the sidebar, where the stop light icon shows up when stopping for a light, which is when the brakes are on."""
     if not friction_braking(ui_state.sm, ui_state.started_frame):
       return
-    speed_height = measure_text_cached(self._speed_font, "0", SPEED_FONT_SIZE).y
-    lead_height = measure_text_cached(self._speed_font, "0", LEAD_FONT_SIZE).y
-    x = rect.x + rect.width - SPEED_RIGHT_MARGIN - BRAKE_DOT_RADIUS - 2
-    y = rect.y + rect.height - SPEED_BOTTOM_MARGIN - speed_height - LEAD_GAP - lead_height - BRAKE_DOT_GAP
-    rl.draw_circle_v(rl.Vector2(x, y), BRAKE_DOT_RADIUS, BRAKE_DOT_COLOR)
+    rl.draw_circle_v(rl.Vector2(self._speed_left - BRAKE_DOT_GAP - BRAKE_DOT_RADIUS, self._speed_center_y), BRAKE_DOT_RADIUS, BRAKE_DOT_COLOR)
 
   def _stop_light_visible(self) -> bool:
     # a stopped lead car also sets shouldStop, that is a car and not a red light, so a lead hides the icon
