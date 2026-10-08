@@ -58,6 +58,20 @@ def stored_items(state, today: str) -> list:
           SimpleNamespace(key="today", label="Today", value=max(last - start, 0.0) if same_day else 0.0, unit=unit, valid=True)]
 
 
+def voltage_item(sm):
+  """The 12 V battery of the car as measured by the panda (peripheralState, in millivolts). It also works with the car
+  off, as long as the device is powered. None until the panda reports a plausible value."""
+  try:
+    if not sm.alive["peripheralState"]:
+      return None
+    millivolts = float(sm["peripheralState"].voltage)
+  except Exception:
+    return None
+  if millivolts < 1000:
+    return None
+  return SimpleNamespace(key="battery_12v", label="12V battery", value=millivolts / 1000.0, unit="V", valid=True)
+
+
 def get_items(sm) -> list:
   """Car data items from carStateSP, empty until the message of the current drive has been received."""
   try:
@@ -107,6 +121,8 @@ class MiciCarDataLayout(Widget):
     self._title.render(rl.Rectangle(rect.x + pad * 1.5, rect.y + pad, rect.width - pad * 3, title_height))
 
     items = get_items(ui_state.sm) or self._stored_items()
+    if (battery := voltage_item(ui_state.sm)) is not None:
+      items = [*items, battery]
     if not items:
       self._empty.render(rl.Rectangle(rect.x, rect.y + title_height, rect.width, rect.height - title_height))
       return

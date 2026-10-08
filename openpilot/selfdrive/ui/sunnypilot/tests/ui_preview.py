@@ -41,7 +41,7 @@ SCENARIOS = {
     ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True),
     ("rpm", "Engine RPM", 1800.0, "rpm", True),
     ("tire_pressure_guess", "Tire pressure?", 264.0, "kPa", True), ("tire_temperature_guess", "Tire temp?", 25.0, "C", True),
-    ("battery", "12V battery", 13.84, "V", True), ("hv", "Hybrid battery", 62.0, "%", True)]),
+    ("hv", "Hybrid battery", 62.0, "%", True)]),
 }
 
 
@@ -50,7 +50,7 @@ def animate_item(item, t: float):
   key, label, value, unit, valid = item
   if key == "rpm" and value == 0.0:
     return item  # engine off stays off
-  wobble = {"odometer": 0.0, "battery": 0.25 * math.sin(t * 1.3), "rpm": 600.0 * math.sin(t * 0.8),
+  wobble = {"odometer": 0.0, "rpm": 600.0 * math.sin(t * 0.8),
             "hv": 3.0 * math.sin(t * 0.2),
             "tire_pressure_guess": 1.5 * math.sin(t * 0.2), "tire_temperature_guess": 1.0 * math.sin(t * 0.15)}.get(key, 0.0)
   return key, label, value + wobble + (t * 0.01 if key == "odometer" else 0.0), unit, valid
@@ -81,6 +81,11 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   ps.pandaStates[0].ignitionLine = True
   pm.send('deviceState', ds)
   pm.send('pandaStates', ps)
+
+  periph = messaging.new_message('peripheralState')
+  periph.peripheralState.pandaType = log.PandaState.PandaType.dos
+  periph.peripheralState.voltage = int((12640 if t is None else 12700 + 600 * math.sin(t * 0.3)))  # millivolts
+  pm.send('peripheralState', periph)
 
   ss = messaging.new_message('selfdriveState')
   ss.selfdriveState.enabled = enabled
@@ -186,7 +191,7 @@ def main() -> None:
     device.set_override_interactive_timeout(99999)
 
     pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2",
-                   "driverMonitoringState", "driverStateV2"])
+                   "driverMonitoringState", "driverStateV2", "peripheralState"])
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)

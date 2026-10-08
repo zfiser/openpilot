@@ -97,6 +97,23 @@ class TestCarData(unittest.TestCase):
     for bad in (None, "x", 5, {}, {"start": "a", "unit": "km"}):
       assert self.mod.stored_items(bad, "2026-10-08") == []
 
+  def test_voltage_item(self):
+    class SMV(_Obj):
+      def __getitem__(self, key):
+        return self.ps
+    item = self.mod.voltage_item(SMV(alive={"peripheralState": True}, ps=_Obj(voltage=12640)))
+    assert (item.key, item.label, item.unit, item.valid) == ("battery_12v", "12V battery", "V", True)
+    assert abs(item.value - 12.64) < 1e-9
+
+  def test_voltage_item_hidden_when_not_alive_or_implausible(self):
+    class SMV(_Obj):
+      def __getitem__(self, key):
+        return self.ps
+    assert self.mod.voltage_item(SMV(alive={"peripheralState": False}, ps=_Obj(voltage=12640))) is None
+    assert self.mod.voltage_item(SMV(alive={"peripheralState": True}, ps=_Obj(voltage=0))) is None
+    assert self.mod.voltage_item(SMV(alive={}, ps=_Obj(voltage=12640))) is None
+    assert self.mod.voltage_item(_Obj()) is None
+
   def test_tile_columns(self):
     assert [self.mod.tile_columns(n) for n in (1, 4, 5, 9, 10, 12)] == [2, 2, 3, 3, 4, 4]
 
