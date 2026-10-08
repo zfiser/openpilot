@@ -18,11 +18,12 @@ class _Params:
     self.values = values
     self.reads = 0
 
-  def get_bool(self, key):
+  def get(self, key, return_default=False):
+    assert return_default, "an unset setting must read as its default (on), not as off"
     self.reads += 1
     if isinstance(self.values.get(key), Exception):
       raise self.values[key]
-    return self.values.get(key, False)
+    return self.values.get(key, True)
 
 
 class TestDisplayOptions(unittest.TestCase):

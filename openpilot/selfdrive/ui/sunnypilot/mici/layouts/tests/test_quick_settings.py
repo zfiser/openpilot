@@ -28,9 +28,9 @@ def _stub(name: str, **attrs) -> types.ModuleType:
 def _load():
   stubs = {
     "openpilot.selfdrive.ui.mici.layouts.settings.toggles": _stub("t", TogglesLayoutMici=_Base),
-    "openpilot.selfdrive.ui.mici.widgets.button": _stub("b", BigButton=_Base, BigParamControl=_Base),
+    "openpilot.selfdrive.ui.mici.widgets.button": _stub("b", BigButton=_Base),
     "openpilot.selfdrive.ui.mici.widgets.dialog": _stub("d", BigConfirmationDialog=_Base),
-    "openpilot.selfdrive.ui.sunnypilot.mici.widgets.param_buttons": _stub("p", BigChoiceParam=_Base),
+    "openpilot.selfdrive.ui.sunnypilot.mici.widgets.param_buttons": _stub("p", BigBoolParam=_Base, BigChoiceParam=_Base),
     "openpilot.selfdrive.ui.ui_state": _stub("u", ui_state=types.SimpleNamespace(is_metric=True)),
     "openpilot.system.ui.lib.application": _stub("a", gui_app=mock.MagicMock()),
     "openpilot.system.ui.widgets": _stub("w", Widget=_Base),

@@ -5,9 +5,24 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui.mici.widgets.button import BigButton
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigParamControl
 from openpilot.selfdrive.ui.sunnypilot.mici.widgets.choices import Choice, label_for, next_choice, with_current
 from openpilot.system.ui.lib.application import MousePos
+
+
+class BigBoolParam(BigParamControl):
+  """BigParamControl that shows the default of a setting nobody has changed yet (get_bool reads an unset setting as off,
+  also when its default is on)."""
+
+  def __init__(self, text: str, param: str):
+    super().__init__(text, param)
+    self.refresh()
+
+  def refresh(self) -> None:
+    try:
+      self.set_checked(bool(self.params.get(self.param, return_default=True)))
+    except Exception:
+      self.set_checked(self.params.get_bool(self.param, False))
 
 
 class BigChoiceParam(BigButton):

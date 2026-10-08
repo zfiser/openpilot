@@ -26,7 +26,7 @@ class DisplayOptions:
       self._next = self._now() + REFRESH_SECONDS
       for k in KEYS:
         try:
-          self._values[k] = bool(self._params.get_bool(k))
+          self._values[k] = bool(self._params.get(k, return_default=True))  # on until switched off, unset means the default
         except Exception:
           self._values[k] = True
     return self._values.get(key, True)

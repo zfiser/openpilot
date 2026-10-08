@@ -7,9 +7,9 @@ See the LICENSE.md file in the root directory for more details.
 from collections.abc import Callable
 
 from openpilot.selfdrive.ui.mici.layouts.settings.toggles import TogglesLayoutMici
-from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigParamControl
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationDialog
-from openpilot.selfdrive.ui.sunnypilot.mici.widgets.param_buttons import BigChoiceParam
+from openpilot.selfdrive.ui.sunnypilot.mici.widgets.param_buttons import BigBoolParam, BigChoiceParam
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
@@ -53,17 +53,17 @@ class SettingsPanel(NavScroller):
 def steering_panel() -> SettingsPanel:
   return SettingsPanel([
     BigChoiceParam("steering on\nbrake", "MadsSteeringMode", STEERING_ON_BRAKE_CHOICES),
-    BigParamControl("engage with\nmain cruise", "MadsMainCruiseAllowed"),
-    BigParamControl("unified\nengagement", "MadsUnifiedEngagementMode"),
-    BigParamControl("mads", "Mads"),
+    BigBoolParam("engage with\nmain cruise", "MadsMainCruiseAllowed"),
+    BigBoolParam("unified\nengagement", "MadsUnifiedEngagementMode"),
+    BigBoolParam("mads", "Mads"),
   ])
 
 
 def lane_change_panel() -> SettingsPanel:
   return SettingsPanel([
     BigChoiceParam("auto lane\nchange", "AutoLaneChangeTimer", LANE_CHANGE_CHOICES),
-    BigParamControl("delay with\nblind spot", "AutoLaneChangeBsmDelay"),
-    BigParamControl("block at\nroad edge", "RoadEdgeLaneChangeEnabled"),
+    BigBoolParam("delay with\nblind spot", "AutoLaneChangeBsmDelay"),
+    BigBoolParam("block at\nroad edge", "RoadEdgeLaneChangeEnabled"),
   ])
 
 
@@ -79,7 +79,7 @@ def screen_panel() -> SettingsPanel:
   return SettingsPanel([
     BigChoiceParam("menu\ntimeout", "InteractivityTimeout", TIMEOUT_CHOICES),
     BigChoiceParam("onroad\nbrightness", "OnroadScreenOffBrightness", ONROAD_BRIGHTNESS_CHOICES),
-    BigParamControl("screen saver", "ScreenSaverEnabled"),
+    BigBoolParam("screen saver", "ScreenSaverEnabled"),
     BigChoiceParam("screen saver\nduration", "ScreenSaverTimeout", SCREEN_SAVER_CHOICES),
   ])
 
@@ -95,10 +95,10 @@ def driving_screen_panel() -> SettingsPanel:
     BigConfirmationDialog("slide to\nreset today", gui_app.texture("icons_mici/settings/device/reboot.png", 64, 70), reset_today)))
   reset_btn.set_enabled(lambda: ui_state.is_offroad())
   return SettingsPanel([
-    BigParamControl("gps speed", "ShowGpsSpeed"),
-    BigParamControl("lead\ndistance", "ShowLeadDistance"),
-    BigParamControl("brake dot", "ShowBrakeDot"),
-    BigParamControl("engine rpm", "ShowRpm"),
+    BigBoolParam("gps speed", "ShowGpsSpeed"),
+    BigBoolParam("lead\ndistance", "ShowLeadDistance"),
+    BigBoolParam("brake dot", "ShowBrakeDot"),
+    BigBoolParam("engine rpm", "ShowRpm"),
     reset_btn,
   ])
 
