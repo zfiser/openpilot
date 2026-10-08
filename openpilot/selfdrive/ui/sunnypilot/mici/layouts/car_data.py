@@ -21,7 +21,7 @@ ONE_DECIMAL_KEYS = {"today"}  # the daily distance has tenths
 # The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
 # there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
 STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("odometer", "Odometer", "km"),
-                  ("rpm", "Engine RPM", "rpm"), ("lead_distance", "Lead distance", "m"), ("friction_brake_force", "Friction brake", "N"))
+                  ("rpm", "Engine RPM", "rpm"), ("engine_temp", "Engine temp", "C"), ("lead_distance", "Lead distance", "m"), ("friction_brake_force", "Friction brake", "N"))
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)

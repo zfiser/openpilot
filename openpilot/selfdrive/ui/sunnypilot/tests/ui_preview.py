@@ -33,6 +33,7 @@ SCENARIOS = {
   rl.KeyboardKey.KEY_TWO: ("lead car", True, False, True, [("odometer", "Odometer", 54321.0, "km", True),
                                                            ("today", "Today", 42.0, "km", True),
                                                            ("rpm", "Engine RPM", 1800.0, "rpm", True),
+                                                           ("engine_temp", "Engine temp", 82.0, "C", True),
                                                            ("lead_distance", "Lead distance", 23.0, "m", True),
                                                            ("friction_brake_force", "Friction brake", 400.0, "N", True)]),
   rl.KeyboardKey.KEY_THREE: ("stop light, engine off", False, True, True, [("odometer", "Odometer", 54321.0, "km", True),
