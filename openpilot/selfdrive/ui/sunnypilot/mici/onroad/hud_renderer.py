@@ -8,6 +8,7 @@ import pyray as rl
 
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad import display_options
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.rpm import find_rpm, format_rpm
 from openpilot.selfdrive.ui.sunnypilot.onroad.blind_spot_indicators import BlindSpotIndicators
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -32,12 +33,13 @@ class HudRendererSP(HudRenderer):
     self._rpm_filter = FirstOrderFilter(0.0, RPM_SMOOTHING_TAU, 1 / gui_app.target_fps)
     self._rpm_font = gui_app.font(FontWeight.BOLD)
     self._rpm_text: str | None = None
+    self._options = display_options.DisplayOptions(ui_state.params)
 
   def _update_state(self) -> None:
     super()._update_state()
     self.blind_spot_indicators.update()
 
-    rpm = find_rpm(ui_state.sm, ui_state.started_frame)
+    rpm = find_rpm(ui_state.sm, ui_state.started_frame) if self._options.enabled(display_options.RPM) else None
     if rpm is None or rpm <= 0:
       self._rpm_filter.x = 0.0  # engine off or unknown, hide the text
       self._rpm_text = None

@@ -41,7 +41,7 @@ def _load_sidebar():
     LAT_ONLY = "lat_only"
     LONG_ONLY = "long_only"
 
-  ui_state = _Obj(status=UIStatus.DISENGAGED, started_frame=0, sm=None, is_metric=True)
+  ui_state = _Obj(status=UIStatus.DISENGAGED, started_frame=0, sm=None, is_metric=True, params=None)
   stubs = {
     "pyray": mock.MagicMock(),
     "openpilot": _stub_module("openpilot"),
@@ -61,6 +61,9 @@ def _load_sidebar():
     "openpilot.system.ui.lib.text_measure": _stub_module("openpilot.system.ui.lib.text_measure", measure_text_cached=mock.MagicMock()),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed": _stub_module(
       "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed", gps_speed=mock.MagicMock(return_value=None)),
+    "openpilot.selfdrive.ui.sunnypilot.mici.onroad.display_options": _stub_module(
+      "openpilot.selfdrive.ui.sunnypilot.mici.onroad.display_options", GPS_SPEED="a", LEAD_DISTANCE="b", BRAKE_DOT="c", RPM="d",
+      DisplayOptions=lambda params: types.SimpleNamespace(enabled=lambda key: True)),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator": _stub_module(
       "openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator", friction_braking=mock.MagicMock(return_value=False)),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance": _stub_module(

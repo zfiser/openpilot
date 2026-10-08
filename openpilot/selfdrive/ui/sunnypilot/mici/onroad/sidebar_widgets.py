@@ -9,6 +9,7 @@ import time
 import pyray as rl
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad import display_options
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator import friction_braking
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed import gps_speed
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance import CLOSING, OPENING, LeadTrend, lead_distance
@@ -41,6 +42,7 @@ class MiciSidebarWidgets(Widget):
     self._confidence_ball = confidence_ball
     self._speed_font = gui_app.font(FontWeight.BOLD)
     self._lead_trend = LeadTrend()
+    self._options = display_options.DisplayOptions(ui_state.params)
     self._speed_left = 0.0  # left edge and vertical centre of the GPS speed digits, where the brake dot goes next to
     self._speed_center_y = 0.0
 
@@ -66,7 +68,7 @@ class MiciSidebarWidgets(Widget):
 
   def _draw_gps_speed(self, rect: rl.Rectangle) -> None:
     """Right aligned in the bottom right corner of the screen, a number without a unit."""
-    speed = gps_speed(ui_state.sm, ui_state.is_metric)
+    speed = gps_speed(ui_state.sm, ui_state.is_metric) if self._options.enabled(display_options.GPS_SPEED) else None
     text = str(speed) if speed is not None else "0"  # the dot keeps its place without a GPS fix
     measured = measure_text_cached(self._speed_font, text, SPEED_FONT_SIZE)
     pos = rl.Vector2(rect.x + rect.width - SPEED_RIGHT_MARGIN - measured.x, rect.y + rect.height - SPEED_BOTTOM_MARGIN - measured.y)
@@ -78,7 +80,7 @@ class MiciSidebarWidgets(Widget):
 
   def _draw_lead_distance(self, rect: rl.Rectangle) -> None:
     """Metres to the lead above the GPS speed, red while the gap shrinks, green while it grows."""
-    distance = lead_distance(ui_state.sm, ui_state.started_frame)
+    distance = lead_distance(ui_state.sm, ui_state.started_frame) if self._options.enabled(display_options.LEAD_DISTANCE) else None
     trend = self._lead_trend.update(distance, time.monotonic())
     if distance is None:
       return
@@ -93,7 +95,7 @@ class MiciSidebarWidgets(Widget):
   def _draw_brake_dot(self, rect: rl.Rectangle) -> None:
     """A dot left of the GPS speed digits while the friction brakes (not regen) are slowing the car. It is kept out of the
     middle of the sidebar, where the stop light icon shows up when stopping for a light, which is when the brakes are on."""
-    if not friction_braking(ui_state.sm, ui_state.started_frame):
+    if not self._options.enabled(display_options.BRAKE_DOT) or not friction_braking(ui_state.sm, ui_state.started_frame):
       return
     rl.draw_circle_v(rl.Vector2(self._speed_left - BRAKE_DOT_GAP - BRAKE_DOT_RADIUS, self._speed_center_y), BRAKE_DOT_RADIUS, BRAKE_DOT_COLOR)
 
