@@ -17,6 +17,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import Scroller
 
 CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goes back, used while the global timeout is on its default
+ONE_DECIMAL_KEYS = {"today"}  # the daily distance has tenths
 FIRST_KEYS = ("today", "battery_12v")  # the first row of the page
 HIDDEN_KEYS = {"lead_distance", "friction_brake_force"}  # shown on the road view instead
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
@@ -36,11 +37,14 @@ def page_timeout(global_timeout) -> int:
     return CAR_DATA_TIMEOUT
 
 
-def format_value(value: float, unit: str, valid: bool) -> str:
-  """Text shown for one tile, '--' when the car did not provide the value."""
+def format_value(value: float, unit: str, valid: bool, decimals: int | None = None) -> str:
+  """Text shown for one tile, '--' when the car did not provide the value. decimals fixes the number of decimal places."""
   if not valid:
     return "--"
-  text = f"{value:,.0f}" if abs(value) >= 1000 or abs(value - round(value)) < 1e-3 else f"{value:.1f}"
+  if decimals is not None:
+    text = f"{value:,.{decimals}f}"
+  else:
+    text = f"{value:,.0f}" if abs(value) >= 1000 or abs(value - round(value)) < 1e-3 else f"{value:.1f}"
   return f"{text} {unit}".rstrip()
 
 
@@ -64,9 +68,9 @@ def stored_items(state, today: str) -> list:
     same_day = state.get("date") in (None, today)
   except Exception:
     return []
+  today = max(float(state["today"]), 0.0) if state.get("today") is not None else max(last - start, 0.0)  # tenths when stored
   return [SimpleNamespace(key="odometer", label="Odometer (last known)", value=last, unit=unit, valid=True),
-          SimpleNamespace(key="today", label="Today (last known)", value=max(last - start, 0.0) if same_day else 0.0,
-                          unit=unit, valid=True)]
+          SimpleNamespace(key="today", label="Today (last known)", value=today if same_day else 0.0, unit=unit, valid=True)]
 
 
 def voltage_item(sm):
@@ -127,7 +131,7 @@ class _TileRow(Widget):
 
       label, value = self._labels(item.key)
       label.set_text(item.label)
-      value.set_text(format_value(item.value, item.unit, item.valid))
+      value.set_text(format_value(item.value, item.unit, item.valid, 1 if item.key in ONE_DECIMAL_KEYS else None))
       label.render(rl.Rectangle(tile.x + inner, tile.y + top, tile.width - inner * 2, label_h))
       value_y = tile.y + top + label_h
       value.render(rl.Rectangle(tile.x + inner, value_y, tile.width - inner * 2, tile.y + tile.height - value_y))

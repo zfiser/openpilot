@@ -136,6 +136,16 @@ class TestCarData(unittest.TestCase):
     assert keys([_Obj(key="odometer"), _Obj(key="today")]) == ["today", "odometer"]
     assert keys([]) == []
 
+  def test_format_fixed_decimals(self):
+    assert self.mod.format_value(42.0, "km", True, 1) == "42.0 km"
+    assert self.mod.format_value(0.0, "km", True, 1) == "0.0 km"
+    assert self.mod.format_value(1234.56, "km", True, 1) == "1,234.6 km"
+    assert self.mod.format_value(5.0, "km", False, 1) == "--"
+
+  def test_stored_today_uses_the_stored_tenths(self):
+    items = {i.key: i for i in self.mod.stored_items({"start": 100.0, "last": 105.0, "unit": "km", "today": 4.6, "date": None}, "2026-10-08")}
+    assert items["today"].value == 4.6
+
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []
