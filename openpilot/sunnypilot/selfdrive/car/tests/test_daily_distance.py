@@ -14,14 +14,16 @@ class FakeParams:
   def __init__(self, stored=None):
     self.values = {PARAM: stored} if stored is not None else {}
     self.writes = 0
+    self.async_writes = 0  # the tenths, not worth waiting for
 
   def get(self, key):
     return self.values.get(key)
 
   def put(self, key, value, block=False):
-    assert block, "the daily baseline must be written with block=True so it survives a power cut"
     self.values[key] = dict(value)
     self.writes += 1
+    if not block:
+      self.async_writes += 1
 
 
 class Clock:
@@ -54,6 +56,7 @@ class TestDailyDistance:
     item = dd.update(odo(10000))
     assert item.key == "today" and item.valid and item.value == 0 and item.unit == "km"
     assert params.values[PARAM] == stored()
+    assert params.async_writes == 0, "the daily baseline must be written with block=True so it survives a power cut"
 
   def test_counts_up_during_the_day_and_keeps_the_last_reading(self):
     dd, params, _ = make()
@@ -219,3 +222,25 @@ class TestDailyDistanceTenths:
     dd.update(odo(10000), 0.0)
     mono.t += 600.0  # the process was frozen for ten minutes
     assert dd.update(odo(10000), 30.0).value < 0.031  # one second at most (30 m), not 18 km
+
+  def test_tenths_are_written_once_a_minute_without_waiting(self):
+    dd, params, mono = make_moving()
+    dd.update(odo(10000), 0.0)
+    params.writes = params.async_writes = 0
+    drive(dd, mono, 10000, 300)  # 15 s at 20 m/s, 0.3 km: the first tenth is written at once, the rest waits a minute
+    assert params.async_writes == 1 and params.writes == 1
+    drive(dd, mono, 10000, 500)  # 25 s more, still inside the minute
+    assert params.async_writes == 1
+    mono.t += 61.0
+    dd.update(odo(10000), 20.0)
+    assert params.async_writes == 2
+    assert 0.3 <= params.values[PARAM]["today"] <= 0.8
+
+  def test_a_tick_is_written_blocking_with_the_exact_tenths(self):
+    dd, params, mono = make_moving()
+    dd.update(odo(10000), 0.0)
+    drive(dd, mono, 10000, 400)
+    before = params.async_writes
+    dd.update(odo(10001), 20.0)
+    assert params.async_writes == before
+    assert params.values[PARAM]["today"] == round(params.values[PARAM]["anchor"], 1)

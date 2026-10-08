@@ -15,6 +15,7 @@ PARAM = "DailyOdometer"
 UNIT_METRES = {"km": 1000.0, "mi": 1609.344}
 SPEED_SCALE = 0.987  # the integrated vEgo came out 1.3% above the odometer in the 2026-10 drives (1013 m per km tick)
 MAX_STEP = 1.0  # s, a longer gap between two updates (a stall) is not integrated
+TENTHS_SAVE_INTERVAL = 60.0  # s, how often the tenths are stored for the page while the car is off, not important enough to wait for
 
 
 def device_now() -> datetime.datetime | None:
@@ -45,6 +46,7 @@ class DailyDistance:
     self._mono = mono
     self._last_mono: float | None = None
     self._since = 0.0  # distance integrated since the last odometer tick (or since the first reading), in odometer units
+    self._last_tenths_save = float("-inf")
     self._since_valid = False  # True when that integration really covers everything since the first reading of the day
     self._now = now  # returns an aware datetime, or None when no valid time is known
     self._tz = tz  # None means the time zone of the operating system
@@ -67,8 +69,9 @@ class DailyDistance:
       pass
     return None
 
-  def _save(self) -> None:
-    self._params.put(PARAM, self._state, block=True)  # rare (a new day or a new odometer unit), wait until it is really stored
+  def _save(self, block: bool = True) -> None:
+    # the baseline and the odometer ticks are rare, wait until they are really stored
+    self._params.put(PARAM, self._state, block=block)
 
   def _integrate(self, v_ego: float | None, unit: str) -> None:
     now = self._mono()
@@ -109,6 +112,7 @@ class DailyDistance:
           else:
             state["anchor"] = odometer.value - state["start"] - 0.5  # the part before is not known, take the middle
           self._since, self._since_valid = 0.0, True
+          state["today"] = round(state["anchor"], 1)  # exact at a tick, stored with it
         changed = True
       if changed:
         self._save()
@@ -120,7 +124,9 @@ class DailyDistance:
         value = state["anchor"] + min(self._since, 1.0)
       elif self._since_valid:
         value = min(self._since, 1.0)
-      if abs(value - state.get("today", -1.0)) >= 0.1:
-        state["today"] = round(value, 1)  # what the page shows while the car is off
-        self._save()
+      now = self._mono()
+      if now - self._last_tenths_save >= TENTHS_SAVE_INTERVAL and abs(value - state.get("today", -1.0)) >= 0.1:
+        state["today"] = round(value, 1)  # what the page shows while the car is off, at most a minute old
+        self._last_tenths_save = now
+        self._save(block=False)
     return make_car_data_item("today", "Today", value, odometer.unit)
