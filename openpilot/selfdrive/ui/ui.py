@@ -8,6 +8,7 @@ from openpilot.common.realtime import Priority, config_realtime_process, set_cor
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.main import MainLayout
 from openpilot.selfdrive.ui.mici.layouts.main import MiciMainLayout
+from openpilot.selfdrive.ui.sunnypilot.screenshot import ScreenshotOnRequest
 from openpilot.selfdrive.ui.ui_state import ui_state
 
 BIG_UI = gui_app.big_ui()
@@ -25,11 +26,15 @@ def main():
     MiciMainLayout()
 
   pm = messaging.PubMaster(['uiDebug'])
+  screenshot = ScreenshotOnRequest() if gui_app.sunnypilot_ui() else None  # `touch /tmp/ui_screenshot_request` saves /tmp/ui_screenshot.png
   for should_render, frame_time, cpu_time in gui_app.render():
     extra_start = time.monotonic()
     ui_state.update()
 
     if should_render:
+      if screenshot is not None:
+        screenshot.update()  # at the end of the frame, everything is drawn
+
       # reaffine after power save offlines our core
       if COMMA_HARDWARE and os.sched_getaffinity(0) != cores:
         try:
