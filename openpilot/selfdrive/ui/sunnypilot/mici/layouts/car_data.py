@@ -122,8 +122,8 @@ class _TileRow(Widget):
     super().__init__()
     self.set_rect(rl.Rectangle(0, 0, width, height))
     self._pad = pad
-    self._label_size = int(17 * scale)
-    self._value_size = int(34 * scale)
+    self._label_size = int(18 * scale)
+    self._value_size = int(35 * scale)
     self._cache = label_cache
     self._items: list = []
 
