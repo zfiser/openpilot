@@ -16,6 +16,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import Scroller
 
+CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goes back, used while the global timeout is on its default
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)
 LABEL_COLOR = rl.Color(255, 255, 255, 140)
@@ -23,6 +24,14 @@ VALUE_COLOR = rl.Color(255, 255, 255, 255)
 EMPTY_COLOR = rl.Color(255, 255, 255, 110)
 REFERENCE_HEIGHT = 240  # font sizes below are tuned for this screen height
 PAD_RATIO = 0.06  # of the screen height, between tiles and around the page; two rows of tiles fill the screen
+
+
+def page_timeout(global_timeout) -> int:
+  """Interactive timeout of the page: the global Interactivity Timeout setting when it is set, else CAR_DATA_TIMEOUT."""
+  try:
+    return int(global_timeout) if global_timeout else CAR_DATA_TIMEOUT
+  except (TypeError, ValueError):
+    return CAR_DATA_TIMEOUT
 
 
 def format_value(value: float, unit: str, valid: bool) -> str:

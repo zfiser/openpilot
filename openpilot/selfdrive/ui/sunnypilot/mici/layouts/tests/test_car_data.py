@@ -116,6 +116,15 @@ class TestCarData(unittest.TestCase):
     assert self.mod.voltage_item(SMV(alive={}, ps=_Obj(voltage=12640))) is None
     assert self.mod.voltage_item(_Obj()) is None
 
+  def test_page_timeout_follows_the_global_setting(self):
+    assert self.mod.page_timeout(150) == 150
+    assert self.mod.page_timeout(40) == 40
+
+  def test_page_timeout_default(self):
+    assert self.mod.page_timeout(0) == self.mod.CAR_DATA_TIMEOUT == 15
+    assert self.mod.page_timeout(None) == 15
+    assert self.mod.page_timeout("x") == 15
+
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []
