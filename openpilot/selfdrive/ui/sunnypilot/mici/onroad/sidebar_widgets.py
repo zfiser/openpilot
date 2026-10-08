@@ -9,6 +9,7 @@ import time
 import pyray as rl
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator import friction_braking
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed import gps_speed
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance import CLOSING, OPENING, LeadTrend, lead_distance
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -25,6 +26,9 @@ SPEED_FONT_SIZE = 56  # digits a bit taller than the 50 px icons, three digits s
 SPEED_RIGHT_MARGIN = 10
 LEAD_FONT_SIZE = 32  # small, sits right above the GPS speed
 LEAD_GAP = 0
+BRAKE_DOT_RADIUS = 1.5  # a 3 px dot
+BRAKE_DOT_GAP = 5  # above the lead distance text box
+BRAKE_DOT_COLOR = rl.Color(255, 90, 0, 255)
 SPEED_BOTTOM_MARGIN = 10  # the text box has some padding below the digits, this lines them up with the wheel icon
 
 
@@ -56,6 +60,7 @@ class MiciSidebarWidgets(Widget):
       self._draw_stop_light_icon(indicator_slot)
     self._draw_gps_speed(rect)
     self._draw_lead_distance(rect)
+    self._draw_brake_dot(rect)
 
   def _draw_gps_speed(self, rect: rl.Rectangle) -> None:
     """Right aligned in the bottom right corner of the screen, a number without a unit."""
@@ -80,6 +85,16 @@ class MiciSidebarWidgets(Widget):
     pos = rl.Vector2(rect.x + rect.width - SPEED_RIGHT_MARGIN - measured.x,
                      rect.y + rect.height - SPEED_BOTTOM_MARGIN - speed_height - LEAD_GAP - measured.y)
     rl.draw_text_ex(self._speed_font, text, pos, LEAD_FONT_SIZE, 0, color)
+
+  def _draw_brake_dot(self, rect: rl.Rectangle) -> None:
+    """A tiny dot at the right edge, above the lead distance, while the friction brakes (not regen) are slowing the car."""
+    if not friction_braking(ui_state.sm, ui_state.started_frame):
+      return
+    speed_height = measure_text_cached(self._speed_font, "0", SPEED_FONT_SIZE).y
+    lead_height = measure_text_cached(self._speed_font, "0", LEAD_FONT_SIZE).y
+    x = rect.x + rect.width - SPEED_RIGHT_MARGIN - BRAKE_DOT_RADIUS - 2
+    y = rect.y + rect.height - SPEED_BOTTOM_MARGIN - speed_height - LEAD_GAP - lead_height - BRAKE_DOT_GAP
+    rl.draw_circle_v(rl.Vector2(x, y), BRAKE_DOT_RADIUS, BRAKE_DOT_COLOR)
 
   def _stop_light_visible(self) -> bool:
     # a stopped lead car also sets shouldStop, that is a car and not a red light, so a lead hides the icon
