@@ -9,7 +9,7 @@ Open the mici UI in a window on a PC with fake onroad data, to look at the sideb
 
   python selfdrive/ui/sunnypilot/tests/ui_preview.py
 
-Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-5 pick a scenario, M switches between metric and imperial units (--metric starts in metric),
+Drag with the mouse to swipe (left from the road view reaches the car data page). Keys 1-7 pick a scenario, M switches between metric and imperial units (--metric starts in metric),
 N cycles the network between WiFi, LTE and offline (tapping the network icon on the home screen only does something when not on WiFi).
 The values animate (lead distance, confidence, steering, driver head, car data).
 Add --shots DIR to render every scenario headless and save PNGs of the road view and the car data page.
@@ -21,7 +21,7 @@ import time
 
 import pyray as rl
 
-from openpilot.cereal import log, messaging
+from openpilot.cereal import custom, log, messaging
 from openpilot.cereal.messaging import PubMaster
 from openpilot.common.prefix import OpenpilotPrefix
 
@@ -42,6 +42,9 @@ SCENARIOS = {
     ("rpm", "Engine RPM", 1800.0, "rpm", True),
     ("tire_pressure_guess", "Tire pressure?", 264.0, "kPa", True), ("tire_temperature_guess", "Tire temp?", 25.0, "C", True),
     ("hv", "Hybrid battery", 62.0, "%", True)]),
+  # extra fields: fixed model confidence, lateral only (MADS without the car's longitudinal control being openpilot's)
+  rl.KeyboardKey.KEY_SIX: ("lateral only, medium confidence", False, False, False, [("odometer", "Odometer", 54321.0, "km", True)], 0.35, True),
+  rl.KeyboardKey.KEY_SEVEN: ("lateral only, low confidence", False, False, False, [("odometer", "Odometer", 54321.0, "km", True)], 0.1, True),
 }
 
 
@@ -62,12 +65,14 @@ NETWORKS = [("wifi", log.DeviceState.NetworkType.wifi), ("LTE", log.DeviceState.
 
 def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log.DeviceState.NetworkType.wifi) -> None:
   """t is seconds since start for animated values, None gives fixed values (used for the screenshots)."""
-  _, lead, stop, enabled, items = scenario
-  moving = enabled and not stop
+  _, lead, stop, enabled, items, *extra = scenario
+  fixed_confidence = extra[0] if extra else None
+  lat_only = bool(extra[1]) if len(extra) > 1 else False
+  moving = (enabled or lat_only) and not stop
   if t is not None:
     items = [animate_item(item, t) for item in items]
   lead_distance = 32.4 if t is None else 32.0 + 18.0 * math.sin(t * 0.5)
-  confidence = 0.9 if t is None else 0.5 + 0.5 * math.sin(t * 0.3)  # sweeps the circle from green over orange to red
+  confidence = fixed_confidence if fixed_confidence is not None else (0.9 if t is None else 0.5 + 0.5 * math.sin(t * 0.3))  # sweeps green, orange, red
   steering_angle = 0.0 if t is None else 25.0 * math.sin(t * 0.4)
   head_yaw = 0.0 if t is None else 0.6 * math.sin(t * 0.6)  # driver looks around, radians
   head_pitch = 0.0 if t is None else 0.25 * math.sin(t * 0.9)
@@ -93,6 +98,15 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   ss.selfdriveState.state = log.SelfdriveState.OpenpilotState.enabled if enabled else log.SelfdriveState.OpenpilotState.disabled
   pm.send('selfdriveState', ss)
 
+  ssp = messaging.new_message('selfdriveStateSP')
+  mads = ssp.selfdriveStateSP.mads
+  mads.available = True
+  mads.enabled = lat_only
+  mads.active = lat_only
+  mads.state = (custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState.enabled if lat_only
+                else custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState.disabled)
+  pm.send('selfdriveStateSP', ssp)
+
   rs = messaging.new_message('radarState')
   rs.radarState.leadOne.present = lead
   rs.radarState.leadOne.dRel = lead_distance
@@ -108,8 +122,9 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   pm.send('carState', car)
 
   mv = messaging.new_message('modelV2')
-  mv.modelV2.meta.disengagePredictions.brakeDisengageProbs = [1.0 - confidence]
-  mv.modelV2.meta.disengagePredictions.steerOverrideProbs = [0.0]
+  # lateral only looks at the steering override probability, fully engaged at the product of both
+  mv.modelV2.meta.disengagePredictions.brakeDisengageProbs = [0.0 if lat_only else 1.0 - confidence]
+  mv.modelV2.meta.disengagePredictions.steerOverrideProbs = [1.0 - confidence if lat_only else 0.0]
   pm.send('modelV2', mv)
 
   dm = messaging.new_message('driverMonitoringState')
@@ -191,7 +206,7 @@ def main() -> None:
     device.set_override_interactive_timeout(99999)
 
     pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2",
-                   "driverMonitoringState", "driverStateV2", "peripheralState"])
+                   "driverMonitoringState", "driverStateV2", "peripheralState", "selfdriveStateSP"])
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)

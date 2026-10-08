@@ -135,6 +135,8 @@ class AugmentedRoadView(CameraView):
     # Use self._content_rect for positioning within camera bounds
     if self._sidebar_widgets is not None:
       self._sidebar_widgets.render(self.rect)
+      if (border := self._confidence_ball.border_color()) is not None:
+        rl.draw_rectangle_lines_ex(self.rect, 1, border)
     else:
       self._confidence_ball.render(self.rect)
 

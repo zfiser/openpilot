@@ -23,6 +23,15 @@ def draw_circle_gradient(center_x: float, center_y: float, radius: int,
                20, rl.BLACK)
 
 
+BORDER_ORANGE = rl.Color(255, 140, 0, 255)
+BORDER_RED = rl.Color(255, 0, 21, 255)
+
+
+def confidence_zone(confidence: float) -> str:
+  """The same thresholds the circle colours use: green above 50%, orange above 20%, red below."""
+  return "high" if confidence > 0.5 else "medium" if confidence > 0.2 else "low"
+
+
 class ConfidenceBall(Widget, ConfidenceBallSP):
   def __init__(self, demo: bool = False):
     Widget.__init__(self)
@@ -47,20 +56,18 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
                                                         (1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs or [1])))
 
   def _dot_colors(self) -> tuple[rl.Color, rl.Color]:
-    # confidence zones
-    if ui_state.status == UIStatus.ENGAGED or self._demo:
-      if self._confidence_filter.x > 0.5:
+    # confidence zones, also in lateral only and longitudinal only (traffic light colours, not the flat mode colours)
+    if ui_state.status in (UIStatus.ENGAGED, UIStatus.LAT_ONLY, UIStatus.LONG_ONLY) or self._demo:
+      zone = confidence_zone(self._confidence_filter.x)
+      if zone == "high":
         top_dot_color = rl.Color(0, 255, 204, 255)
         bottom_dot_color = rl.Color(0, 255, 38, 255)
-      elif self._confidence_filter.x > 0.2:
+      elif zone == "medium":
         top_dot_color = rl.Color(255, 200, 0, 255)
         bottom_dot_color = rl.Color(255, 115, 0, 255)
       else:
         top_dot_color = rl.Color(255, 0, 21, 255)
         bottom_dot_color = rl.Color(255, 0, 89, 255)
-
-    elif ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
-      top_dot_color = bottom_dot_color = self.get_lat_long_dot_color()
 
     elif ui_state.status == UIStatus.OVERRIDE:
       top_dot_color = rl.Color(255, 255, 255, 255)
@@ -71,6 +78,12 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       bottom_dot_color = rl.Color(13, 13, 13, 255)
 
     return top_dot_color, bottom_dot_color
+
+  def border_color(self) -> rl.Color | None:
+    """Colour of a 1 px frame around the whole screen while the confidence is lower, None when it is high or not engaged."""
+    if ui_state.status not in (UIStatus.ENGAGED, UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
+      return None
+    return {"medium": BORDER_ORANGE, "low": BORDER_RED}.get(confidence_zone(self._confidence_filter.x))
 
   def render_static(self, rect: rl.Rectangle, radius: int = 20) -> None:
     self._update_state()
