@@ -22,9 +22,7 @@ LABEL_COLOR = rl.Color(255, 255, 255, 140)
 VALUE_COLOR = rl.Color(255, 255, 255, 255)
 EMPTY_COLOR = rl.Color(255, 255, 255, 110)
 REFERENCE_HEIGHT = 240  # font sizes below are tuned for this screen height
-TILE_HEIGHT_RATIO = 0.33  # of the screen height, two rows of tiles fit below the title
-TITLE_HEIGHT_RATIO = 0.16
-PAD_RATIO = 0.06
+PAD_RATIO = 0.06  # of the screen height, between tiles and around the page; two rows of tiles fill the screen
 
 
 def format_value(value: float, unit: str, valid: bool) -> str:
@@ -78,17 +76,6 @@ def get_items(sm) -> list:
     return []
 
 
-class _TitleRow(Widget):
-  def __init__(self, width: float, height: float, pad: float, scale: float):
-    super().__init__()
-    self.set_rect(rl.Rectangle(0, 0, width, height))
-    self._label = UnifiedLabel("car data", int(26 * scale), FontWeight.SEMI_BOLD, LABEL_COLOR)
-    self._pad = pad
-
-  def _render(self, rect: rl.Rectangle) -> None:
-    self._label.render(rl.Rectangle(rect.x + self._pad * 0.5, rect.y, rect.width - self._pad, rect.height))
-
-
 class _TileRow(Widget):
   """A fixed size row with up to two tiles, the fonts do not shrink when there are many rows."""
 
@@ -115,6 +102,8 @@ class _TileRow(Widget):
     tile_w = (rect.width - pad * (COLUMNS + 1)) / COLUMNS
     inner = pad * 1.2
     label_h = self._label_size * 1.3
+    value_h = self._value_size * 1.2
+    top = max((rect.height - label_h - value_h) / 2, inner * 0.5)
     for col, item in enumerate(self._items):
       tile = rl.Rectangle(rect.x + pad + col * (tile_w + pad), rect.y, tile_w, rect.height)
       rl.draw_rectangle_rounded(tile, 0.18, 8, TILE_COLOR)
@@ -122,8 +111,8 @@ class _TileRow(Widget):
       label, value = self._labels(item.key)
       label.set_text(item.label)
       value.set_text(format_value(item.value, item.unit, item.valid))
-      label.render(rl.Rectangle(tile.x + inner, tile.y + inner * 0.5, tile.width - inner * 2, label_h))
-      value_y = tile.y + inner * 0.5 + label_h
+      label.render(rl.Rectangle(tile.x + inner, tile.y + top, tile.width - inner * 2, label_h))
+      value_y = tile.y + top + label_h
       value.render(rl.Rectangle(tile.x + inner, value_y, tile.width - inner * 2, tile.y + tile.height - value_y))
 
 
@@ -136,13 +125,11 @@ class MiciCarDataLayout(Scroller):
     self._width = gui_app.width
     self._scale = height / REFERENCE_HEIGHT
     self._pad = height * PAD_RATIO
-    self._tile_height = height * TILE_HEIGHT_RATIO
+    self._tile_height = (height - 3 * self._pad) / 2  # two rows fill the screen, more rows scroll
     super().__init__(horizontal=False, spacing=int(self._pad), pad=int(self._pad), scroll_indicator=False, edge_shadows=False)
 
     self._empty = UnifiedLabel("no car data available", int(30 * self._scale), FontWeight.MEDIUM, EMPTY_COLOR,
                                alignment=TextAlignment.CENTER, alignment_vertical=TextAlignmentVertical.MIDDLE)
-    self._title = _TitleRow(self._width, height * TITLE_HEIGHT_RATIO, self._pad, self._scale)
-    self._scroller.add_widget(self._title)
     self._rows: list[_TileRow] = []
     self._label_cache: dict = {}
     self._has_items = False

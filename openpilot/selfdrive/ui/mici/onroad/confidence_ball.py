@@ -79,7 +79,7 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
 
     return top_dot_color, bottom_dot_color
 
-  def border_color(self) -> rl.Color | None:
+  def border_color(self) -> "rl.Color | None":  # a string, rl.Color is a function in pyray and cannot be used with |
     """Colour of a 1 px frame around the whole screen while the confidence is lower, None when it is high or not engaged."""
     if ui_state.status not in (UIStatus.ENGAGED, UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
       return None
