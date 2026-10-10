@@ -48,6 +48,9 @@ SCENARIOS = {
   # extra fields: fixed model confidence, lateral only (MADS without the car's longitudinal control being openpilot's)
   rl.KeyboardKey.KEY_SIX: ("lateral only, medium confidence", False, False, False, [("odometer", "Odometer", 54321.0, "km", True)], 0.35, True),
   rl.KeyboardKey.KEY_SEVEN: ("lateral only, low confidence", False, False, False, [("odometer", "Odometer", 54321.0, "km", True)], 0.1, True),
+  rl.KeyboardKey.KEY_EIGHT: ("lateral only, alert on screen (the RPM hides)", False, False, False,
+                             [("odometer", "Odometer", 54321.0, "km", True), ("rpm", "Engine RPM", 1800.0, "rpm", True)], 0.9, True,
+                             "Changing Lanes"),
 }
 
 
@@ -71,6 +74,7 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   _, lead, stop, enabled, items, *extra = scenario
   fixed_confidence = extra[0] if extra else None
   lat_only = bool(extra[1]) if len(extra) > 1 else False
+  alert_text = extra[2] if len(extra) > 2 else None  # a message that covers the top of the road view
   moving = (enabled or lat_only) and not stop
   if t is not None:
     items = [animate_item(item, t) for item in items]
@@ -99,6 +103,10 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   ss.selfdriveState.enabled = enabled
   ss.selfdriveState.active = enabled
   ss.selfdriveState.state = log.SelfdriveState.OpenpilotState.enabled if enabled else log.SelfdriveState.OpenpilotState.disabled
+  if alert_text:
+    ss.selfdriveState.alertText1 = alert_text
+    ss.selfdriveState.alertSize = log.SelfdriveState.AlertSize.mid
+    ss.selfdriveState.alertStatus = log.SelfdriveState.AlertStatus.userPrompt
   pm.send('selfdriveState', ss)
 
   ssp = messaging.new_message('selfdriveStateSP')
