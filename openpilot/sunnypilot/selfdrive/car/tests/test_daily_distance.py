@@ -14,16 +14,14 @@ class FakeParams:
   def __init__(self, stored=None):
     self.values = {PARAM: stored} if stored is not None else {}
     self.writes = 0
-    self.async_writes = 0  # the tenths, not worth waiting for
 
   def get(self, key):
     return self.values.get(key)
 
   def put(self, key, value, block=False):
+    assert block, "the daily baseline must be written with block=True so it survives a power cut"
     self.values[key] = dict(value)
     self.writes += 1
-    if not block:
-      self.async_writes += 1
 
 
 class Clock:
@@ -56,7 +54,6 @@ class TestDailyDistance:
     item = dd.update(odo(10000))
     assert item.key == "today" and item.valid and item.value == 0 and item.unit == "km"
     assert params.values[PARAM] == stored()
-    assert params.async_writes == 0, "the daily baseline must be written with block=True so it survives a power cut"
 
   def test_counts_up_during_the_day_and_keeps_the_last_reading(self):
     dd, params, _ = make()
@@ -131,120 +128,3 @@ class TestDailyDistance:
     for bad in ("nonsense", {"date": "2026-10-06"}, {"start": 1}, 5):
       dd, _, _ = make(stored=bad)
       assert dd.update(odo(10000)).value == 0
-
-
-class Mono:
-  def __init__(self):
-    self.t = 0.0
-
-  def __call__(self):
-    return self.t
-
-
-def make_moving(stored_state=None):
-  params, clock, mono = FakeParams(stored_state), Clock(datetime.datetime(2026, 10, 6, 8, 0, tzinfo=datetime.UTC)), Mono()
-  return DailyDistance(params, now=clock, tz=datetime.UTC, mono=mono), params, mono
-
-
-def drive(dd, mono, odometer, metres, speed=20.0, step=0.1):
-  """Drive the given distance at a constant speed, the odometer reading is whatever the caller reports."""
-  item = None
-  for _ in range(round(metres / (speed * step))):
-    mono.t += step
-    item = dd.update(odo(odometer), speed)
-  return item
-
-
-class TestDailyDistanceTenths:
-  def test_without_speed_it_is_whole_units(self):
-    dd, _, _ = make()
-    dd.update(odo(10000))
-    assert dd.update(odo(10003)).value == 3
-
-  def test_counts_tenths_before_the_first_tick(self):
-    dd, _, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    value = drive(dd, mono, 10000, 300).value
-    assert abs(value - 0.3 * 0.987) < 0.01
-
-  def test_first_tick_anchors_on_the_distance_driven(self):
-    dd, _, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    drive(dd, mono, 10000, 400)  # the car was 0.6 km into the unit when the day started
-    first = dd.update(odo(10001), 20.0).value
-    assert abs(first - 0.395) < 0.02  # not 1.0 (odometer minus start): only 400 m were driven
-
-  def test_following_ticks_add_whole_units_and_the_speed_fills_in_between(self):
-    dd, _, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    drive(dd, mono, 10000, 400)
-    dd.update(odo(10001), 20.0)
-    drive(dd, mono, 10001, 500)
-    value = dd.update(odo(10001), 20.0).value
-    assert abs(value - (0.395 + 0.4935)) < 0.03
-    drive(dd, mono, 10001, 480)
-    after_tick = dd.update(odo(10002), 20.0).value
-    assert abs(after_tick - 1.395) < 0.03  # snaps to anchor + exactly one unit
-
-  def test_never_more_than_one_unit_ahead_of_the_anchor(self):
-    dd, _, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    drive(dd, mono, 10000, 400)
-    dd.update(odo(10001), 20.0)
-    value = drive(dd, mono, 10001, 3000).value  # the odometer tick never came, the speed integration must not run away
-    assert value <= 0.395 + 1.0 + 1e-6
-
-  def test_stored_value_for_the_page_follows_in_tenths(self):
-    dd, params, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    mono.t += 61.0  # the first write at the baseline starts the minute
-    dd.update(odo(10000), 0.0)
-    drive(dd, mono, 10000, 450)
-    assert abs(params.values[PARAM]["today"] - 0.1) < 0.11  # written at the first tenth after the minute, the rest waits another minute
-
-  def test_restart_keeps_the_anchor(self):
-    dd, params, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    drive(dd, mono, 10000, 400)
-    dd.update(odo(10001), 20.0)
-    dd2, _, mono2 = make_moving(params.values[PARAM])
-    value = dd2.update(odo(10001), 0.0).value
-    assert abs(value - 0.395) < 0.02
-
-  def test_restart_before_any_tick_estimates_the_middle_of_the_unit(self):
-    dd, params, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    drive(dd, mono, 10000, 200)
-    dd2, _, _ = make_moving(params.values[PARAM])
-    dd2.update(odo(10000), 0.0)
-    assert abs(dd2.update(odo(10001), 20.0).value - 0.5) < 1e-9
-
-  def test_a_stall_is_not_integrated(self):
-    dd, _, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    mono.t += 600.0  # the process was frozen for ten minutes
-    assert dd.update(odo(10000), 30.0).value < 0.031  # one second at most (30 m), not 18 km
-
-  def test_tenths_are_written_once_a_minute_without_waiting(self):
-    dd, params, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    mono.t += 61.0  # the first write at the baseline starts the minute
-    dd.update(odo(10000), 0.0)
-    params.writes = params.async_writes = 0
-    drive(dd, mono, 10000, 300)  # 15 s at 20 m/s, 0.3 km: the first tenth is written at once, the rest waits a minute
-    assert params.async_writes == 1 and params.writes == 1
-    drive(dd, mono, 10000, 500)  # 25 s more, still inside the minute
-    assert params.async_writes == 1
-    mono.t += 61.0
-    dd.update(odo(10000), 20.0)
-    assert params.async_writes == 2
-    assert 0.7 <= params.values[PARAM]["today"] <= 0.9
-
-  def test_a_tick_is_written_blocking_with_the_exact_tenths(self):
-    dd, params, mono = make_moving()
-    dd.update(odo(10000), 0.0)
-    drive(dd, mono, 10000, 400)
-    before = params.async_writes
-    dd.update(odo(10001), 20.0)
-    assert params.async_writes == before
-    assert params.values[PARAM]["today"] == round(params.values[PARAM]["anchor"], 1)

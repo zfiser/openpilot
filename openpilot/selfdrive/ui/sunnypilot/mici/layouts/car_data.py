@@ -17,7 +17,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import Scroller
 
 CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goes back, used while the global timeout is on its default
-ONE_DECIMAL_KEYS = {"today"}  # the daily distance has tenths
+ONE_DECIMAL_KEYS: set[str] = set()  # keys shown with one decimal place, none: the odometer only counts whole units
 # The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
 # there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
 STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("rpm", "Engine RPM", "rpm"),
@@ -86,7 +86,7 @@ def stored_items(state, today: str) -> list:
     same_day = state.get("date") in (None, today)
   except Exception:
     return []
-  today = max(float(state["today"]), 0.0) if state.get("today") is not None else max(last - start, 0.0)  # tenths when stored
+  today = max(last - start, 0.0)
   return [SimpleNamespace(key="odometer", label="Odometer (last known)", value=last, unit=unit, valid=True),
           SimpleNamespace(key="today", label="Today (last known)", value=today if same_day else 0.0, unit=unit, valid=True)]
 

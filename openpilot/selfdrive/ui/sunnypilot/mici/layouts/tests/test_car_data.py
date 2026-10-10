@@ -143,9 +143,10 @@ class TestCarData(unittest.TestCase):
     assert self.mod.format_value(1234.56, "km", True, 1) == "1,234.6 km"
     assert self.mod.format_value(5.0, "km", False, 1) == "--"
 
-  def test_stored_today_uses_the_stored_tenths(self):
-    items = {i.key: i for i in self.mod.stored_items({"start": 100.0, "last": 105.0, "unit": "km", "today": 4.6, "date": None}, "2026-10-08")}
-    assert items["today"].value == 4.6
+  def test_stored_today_is_the_odometer_difference_even_with_old_tenths_stored(self):
+    state = {"start": 100.0, "last": 105.0, "unit": "km", "today": 4.6, "anchor": 4.1, "date": None}
+    items = {i.key: i for i in self.mod.stored_items(state, "2026-10-08")}
+    assert items["today"].value == 5.0
 
   def test_every_standard_tile_is_there_even_without_data(self):
     items = self.mod.complete_items([])
