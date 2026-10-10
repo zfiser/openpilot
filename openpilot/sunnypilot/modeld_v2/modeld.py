@@ -47,6 +47,7 @@ from openpilot.sunnypilot.modeld_v2.parse_model_outputs import Parser
 from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
+from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, LanePosition
 from openpilot.sunnypilot.modeld_v2.compile_modeld import (derive_frame_skip, make_split_input_queues,
                                                            make_supercombo_input_queues, nv12_copy_size,
                                                            WARP_INPUTS, POLICY_INPUTS)
@@ -389,7 +390,8 @@ def main(demo=False):
   # messaging
   pub_socks = ["modelV2", "drivingModelData", "cameraOdometry", "modelDataV2SP"] + (["chestnutState"] if CHESTNUT else [])
   pm = PubMaster(pub_socks)
-  sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "driverMonitoringState", "carControl", "lateralDelay"])
+  sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "driverMonitoringState", "carControl", "lateralDelay",
+                  "selfdriveState", "selfdriveStateSP"])
 
   publish_state = PublishState()
   chestnut_state = ChestnutState(pm, model.chestnut) if CHESTNUT else None
@@ -407,6 +409,9 @@ def main(demo=False):
   meta_main = FrameMeta()
   meta_extra = FrameMeta()
   camera_offset_helper = CameraOffsetHelper()
+  lane_position = LanePosition()  # hug the left or right lane line on request, see lane_position.py
+  lane_mode = CENTER
+  base_camera_offset = 0.0
 
 
   if demo:
@@ -464,7 +469,13 @@ def main(demo=False):
     if sm.frame % 60 == 0:
       model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay)
       model.PLANPLUS_CONTROL = params.get("PlanplusControl", return_default=True)
-      camera_offset_helper.set_offset(params.get("CameraOffset", return_default=True))
+      base_camera_offset = params.get("CameraOffset", return_default=True)
+    if sm.frame % 10 == 0:
+      lane_mode = int(params.get("LanePosition", return_default=True))
+      if lane_mode != CENTER and not (sm["selfdriveState"].enabled or sm["selfdriveStateSP"].mads.active):
+        params.put("LanePosition", CENTER)  # back to the center as soon as openpilot is not steering
+        lane_mode = CENTER
+    camera_offset_helper.set_offset(base_camera_offset + lane_position.offset)
     lat_delay = model.lat_delay + model.LAT_SMOOTH_SECONDS
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
@@ -543,6 +554,12 @@ def main(demo=False):
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, live_calib_seen, meta_constants)
       modelv2_send.modelV2.big = model.chestnut
+
+      lane_lines, lane_probs = modelv2_send.modelV2.laneLines, modelv2_send.modelV2.laneLineProbs
+      if len(lane_lines) >= 3 and len(lane_probs) >= 3 and len(lane_lines[1].y) >= 3 and len(lane_lines[2].y) >= 3:
+        # the two lines next to the car, the first few points are the ones closest to it
+        lane_position.update(lane_mode, float(np.mean(lane_lines[1].y[:3])), float(np.mean(lane_lines[2].y[:3])),
+                             lane_probs[1], lane_probs[2], DT_MDL)
 
       desire_state = modelv2_send.modelV2.meta.desireState
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]

@@ -38,7 +38,7 @@ def _load():
     "openpilot": _stub_module("openpilot"),
     "openpilot.selfdrive": _stub_module("openpilot.selfdrive"),
     "openpilot.selfdrive.ui": _stub_module("openpilot.selfdrive.ui"),
-    "openpilot.selfdrive.ui.ui_state": _stub_module("openpilot.selfdrive.ui.ui_state", ui_state=ui_state),
+    "openpilot.selfdrive.ui.ui_state": _stub_module("openpilot.selfdrive.ui.ui_state", ui_state=ui_state, UIStatus=mock.MagicMock()),
     "openpilot.system": _stub_module("openpilot.system"),
     "openpilot.system.ui": _stub_module("openpilot.system.ui"),
     "openpilot.system.ui.lib": _stub_module("openpilot.system.ui.lib"),
@@ -189,6 +189,12 @@ class TestCarData(unittest.TestCase):
   def test_time_tile_comes_after_the_engine_temperature(self):
     keys = ["odometer", "drive_time", "engine_temp", "rpm", "battery_12v", "today"]
     assert [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])] ==       ["today", "battery_12v", "rpm", "engine_temp", "drive_time", "odometer"]
+
+  def test_hug_buttons_select_a_side_and_press_again_to_center(self):
+    t = self.mod.toggle_lane_position
+    assert t(0, 1) == 1 and t(0, -1) == -1
+    assert t(1, 1) == 0 and t(-1, -1) == 0
+    assert t(1, -1) == -1 and t(-1, 1) == 1
 
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pyray as rl
 
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import FontWeight, gui_app, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
@@ -26,6 +26,9 @@ DURATION_KEYS = {"drive_time"}  # seconds, shown as h:mm
 HIDDEN_KEYS = {"lead_distance", "friction_brake_force"}  # drawn on the driving screen only, not looked at while driving
 LAST_USEFUL_KEY = "odometer"  # after everything else that is useful, before the experimental tiles
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
+LANE_LEFT, LANE_CENTER, LANE_RIGHT = 1, 0, -1  # the LanePosition setting, read by the model process
+HUG_ROW_HEIGHT_RATIO = 0.6  # of a normal tile row
+ACTIVE_COLOR = rl.Color(60, 220, 110, 70)
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
 TILE_COLOR = rl.Color(255, 255, 255, 18)
 LABEL_COLOR = rl.Color(255, 255, 255, 140)
@@ -77,6 +80,11 @@ def order_items(items: list) -> list:
   experimental = [i for i in items if i.key.startswith(EXPERIMENTAL_PREFIXES)]
   other = [i for i in items if i.key not in (*standard_keys, LAST_USEFUL_KEY) and not i.key.startswith(EXPERIMENTAL_PREFIXES)]
   return standard + other + last_useful + experimental
+
+
+def toggle_lane_position(current: int, pressed: int) -> int:
+  """Pressing the button of the side the car is already hugging goes back to the center, any other press selects that side."""
+  return LANE_CENTER if current == pressed else pressed
 
 
 def rows_of(items: list, columns: int = COLUMNS) -> list[list]:
@@ -167,6 +175,59 @@ class _TileRow(Widget):
       value.render(rl.Rectangle(tile.x + inner, value_y, tile.width - inner * 2, tile.y + tile.height - value_y))
 
 
+class _HugRow(Widget):
+  """Two buttons at the top of the page: hug the left or the right lane line (the model decides how close, see
+  modeld_v2/lane_position.py). They only work while openpilot is steering, the model process resets the setting when it stops."""
+
+  def __init__(self, width: float, height: float, pad: float, scale: float):
+    super().__init__()
+    self.set_rect(rl.Rectangle(0, 0, width, height))
+    self._pad = pad
+    self._labels = {side: UnifiedLabel(text, int(30 * scale), FontWeight.BOLD, VALUE_COLOR, alignment=TextAlignment.CENTER,
+                                       alignment_vertical=TextAlignmentVertical.MIDDLE, wrap_text=False)
+                    for side, text in ((LANE_LEFT, "hug left"), (LANE_RIGHT, "hug right"))}
+    self._mode = LANE_CENTER
+    self._next_read = 0.0
+
+  @staticmethod
+  def _steering() -> bool:
+    return ui_state.status != UIStatus.DISENGAGED
+
+  def _read_mode(self) -> None:
+    if time.monotonic() >= self._next_read:
+      self._next_read = time.monotonic() + 0.5
+      try:
+        self._mode = int(ui_state.params.get("LanePosition", return_default=True))
+      except Exception:
+        self._mode = LANE_CENTER
+
+  def _tile(self, rect: rl.Rectangle, side: int) -> rl.Rectangle:
+    tile_w = (rect.width - self._pad * (COLUMNS + 1)) / COLUMNS
+    col = 0 if side == LANE_LEFT else 1
+    return rl.Rectangle(rect.x + self._pad + col * (tile_w + self._pad), rect.y, tile_w, rect.height)
+
+  def _render(self, rect: rl.Rectangle) -> None:
+    self._read_mode()
+    for side, label in self._labels.items():
+      tile = self._tile(rect, side)
+      active = self._mode == side
+      rl.draw_rectangle_rounded(tile, 0.18, 8, ACTIVE_COLOR if active else TILE_COLOR)
+      label.set_text_color(VALUE_COLOR if self._steering() or active else EMPTY_COLOR)
+      label.render(tile)
+
+  def _handle_mouse_release(self, mouse_pos) -> None:
+    if not self._steering():
+      return  # openpilot is not steering, the setting would be reset at once
+    for side in self._labels:
+      tile = self._tile(self.rect, side)
+      if tile.x <= mouse_pos.x <= tile.x + tile.width and tile.y <= mouse_pos.y <= tile.y + tile.height:
+        self._read_mode()
+        self._mode = toggle_lane_position(self._mode, side)
+        ui_state.params.put("LanePosition", self._mode)
+        self._next_read = time.monotonic() + 1.0  # show what was pressed, not the value from before the write
+        return
+
+
 class MiciCarDataLayout(Scroller):
   """Swipe page listing whatever extra car data the brand specific car state extension reports. Tiles keep their size,
   more tiles than fit make the page scroll vertically."""
@@ -182,6 +243,7 @@ class MiciCarDataLayout(Scroller):
     self._empty = UnifiedLabel("no car data available", int(30 * self._scale), FontWeight.MEDIUM, EMPTY_COLOR,
                                alignment=TextAlignment.CENTER, alignment_vertical=TextAlignmentVertical.MIDDLE)
     self._rows: list[_TileRow] = []
+    self._scroller.add_widget(_HugRow(self._width, self._tile_height * HUG_ROW_HEIGHT_RATIO, self._pad, self._scale))
     self._label_cache: dict = {}
     self._has_items = False
     self._stored: list = []
