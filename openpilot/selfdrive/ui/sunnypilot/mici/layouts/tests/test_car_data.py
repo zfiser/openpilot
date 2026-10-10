@@ -81,14 +81,14 @@ class TestCarData(unittest.TestCase):
 
   def test_stored_items_same_day(self):
     state = {"date": "2026-10-08", "start": 10000.0, "unit": "km", "last": 10042.0}
-    odometer, today = self.mod.stored_items(state, "2026-10-08")
+    odometer, today, _ = self.mod.stored_items(state, "2026-10-08")
     assert (odometer.key, odometer.value, odometer.unit, odometer.valid) == ("odometer", 10042.0, "km", True)
     assert odometer.label == "Odometer (last known)" and today.label == "Today (last known)"
     assert (today.key, today.value, today.unit, today.valid) == ("today", 42.0, "km", True)
 
   def test_stored_items_a_new_day_starts_at_zero(self):
     state = {"date": "2026-10-07", "start": 10000.0, "unit": "mi", "last": 10042.0}
-    odometer, today = self.mod.stored_items(state, "2026-10-08")
+    odometer, today, _ = self.mod.stored_items(state, "2026-10-08")
     assert odometer.value == 10042.0 and today.value == 0.0 and today.unit == "mi"
 
   def test_stored_items_unknown_date_counts_as_today_and_old_format_works(self):
@@ -170,6 +170,25 @@ class TestCarData(unittest.TestCase):
               _Obj(key="rpm", label="Engine RPM", value=1800.0, unit="rpm", valid=True)])
     assert [i.key for i in self.mod.get_items(sm)] == ["rpm"]
     assert not {"lead_distance", "friction_brake_force"} & {key for key, _, _ in self.mod.STANDARD_TILES}
+
+  def test_duration_format(self):
+    assert self.mod.format_duration(0) == "0:00"
+    assert self.mod.format_duration(59) == "0:00"
+    assert self.mod.format_duration(7 * 60 + 30) == "0:07"
+    assert self.mod.format_duration(85 * 60) == "1:25"
+    assert self.mod.format_duration(10 * 3600 + 5 * 60) == "10:05"
+    assert self.mod.format_duration(-5) == "0:00"
+
+  def test_stored_time_is_shown_for_today_only(self):
+    state = {"start": 100.0, "last": 105.0, "unit": "km", "seconds": 5100.0, "date": "2026-10-08"}
+    assert {i.key: i for i in self.mod.stored_items(state, "2026-10-08")}["drive_time"].value == 5100.0
+    assert {i.key: i for i in self.mod.stored_items(state, "2026-10-09")}["drive_time"].value == 0.0
+    old = {"start": 100.0, "last": 105.0, "unit": "km", "date": None}
+    assert {i.key: i for i in self.mod.stored_items(old, "2026-10-08")}["drive_time"].value == 0.0
+
+  def test_time_tile_comes_after_the_engine_temperature(self):
+    keys = ["odometer", "drive_time", "engine_temp", "rpm", "battery_12v", "today"]
+    assert [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])] ==       ["today", "battery_12v", "rpm", "engine_temp", "drive_time", "odometer"]
 
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]

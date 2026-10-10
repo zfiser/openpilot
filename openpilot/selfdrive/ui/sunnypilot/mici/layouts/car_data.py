@@ -21,7 +21,8 @@ ONE_DECIMAL_KEYS: set[str] = set()  # keys shown with one decimal place, none: t
 # The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
 # there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
 STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("rpm", "Engine RPM", "rpm"),
-                  ("engine_temp", "Engine temp", "C"), ("odometer", "Odometer", "km"))
+                  ("engine_temp", "Engine temp", "C"), ("drive_time", "Time", "s"), ("odometer", "Odometer", "km"))
+DURATION_KEYS = {"drive_time"}  # seconds, shown as h:mm
 HIDDEN_KEYS = {"lead_distance", "friction_brake_force"}  # drawn on the driving screen only, not looked at while driving
 LAST_USEFUL_KEY = "odometer"  # after everything else that is useful, before the experimental tiles
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
@@ -61,6 +62,12 @@ def complete_items(items: list) -> list:
   return [*items, *missing]
 
 
+def format_duration(seconds: float) -> str:
+  """Seconds as hours:minutes, for example 1:25 and 0:07."""
+  minutes = int(max(seconds, 0.0) // 60)
+  return f"{minutes // 60}:{minutes % 60:02d}"
+
+
 def order_items(items: list) -> list:
   """Standard tiles first in their fixed order (so 'today' and the 12 V battery are the first row, RPM and the engine
   temperature the second), then whatever else the car reports, the odometer, and the experimental tiles last."""
@@ -87,8 +94,10 @@ def stored_items(state, today: str) -> list:
   except Exception:
     return []
   today = max(last - start, 0.0)
+  seconds = max(float(state.get("seconds", 0.0)), 0.0) if same_day else 0.0
   return [SimpleNamespace(key="odometer", label="Odometer (last known)", value=last, unit=unit, valid=True),
-          SimpleNamespace(key="today", label="Today (last known)", value=today if same_day else 0.0, unit=unit, valid=True)]
+          SimpleNamespace(key="today", label="Today (last known)", value=today if same_day else 0.0, unit=unit, valid=True),
+          SimpleNamespace(key="drive_time", label="Time (last known)", value=seconds, unit="s", valid=True)]
 
 
 def voltage_item(sm):
@@ -149,7 +158,10 @@ class _TileRow(Widget):
 
       label, value = self._labels(item.key)
       label.set_text(item.label)
-      value.set_text(format_value(item.value, item.unit, item.valid, 1 if item.key in ONE_DECIMAL_KEYS else None))
+      if item.key in DURATION_KEYS:
+        value.set_text(format_duration(item.value) if item.valid else "--")
+      else:
+        value.set_text(format_value(item.value, item.unit, item.valid, 1 if item.key in ONE_DECIMAL_KEYS else None))
       label.render(rl.Rectangle(tile.x + inner, tile.y + top, tile.width - inner * 2, label_h))
       value_y = tile.y + top + label_h
       value.render(rl.Rectangle(tile.x + inner, value_y, tile.width - inner * 2, tile.y + tile.height - value_y))
