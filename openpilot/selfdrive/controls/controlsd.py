@@ -23,6 +23,7 @@ from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
+from openpilot.sunnypilot.selfdrive.controls.lib.lane_change_smoothing import DEFAULT_PACE, LaneChangeSmoother
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
@@ -52,6 +53,9 @@ class Controls(ControlsExt):
     self.steer_limited_by_safety = False
     self.curvature = 0.0
     self.desired_curvature = 0.0
+    self.lane_change_smoother = LaneChangeSmoother()  # slower curvature changes during a lane change, see lane_change_smoothing.py
+    self.lane_change_pace = DEFAULT_PACE
+    self.state_control_frame = 0
 
     self.pose_calibrator = PoseCalibrator()
     self.calibrated_pose: Pose | None = None
@@ -143,7 +147,13 @@ class Controls(ControlsExt):
       new_desired_curvature = self.sm['lateralManeuverPlan'].desiredCurvature if CC.latActive else self.curvature
     else:
       new_desired_curvature = model_v2.action.desiredCurvature if CC.latActive else self.curvature
-    self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
+    if self.state_control_frame % 100 == 0:  # the setting is read once a second
+      self.lane_change_pace = self.params.get("LaneChangeSmoothing", return_default=True)
+    self.state_control_frame += 1
+    in_lane_change = model_v2.meta.laneChangeState in (LaneChangeState.laneChangeStarting, LaneChangeState.laneChangeFinishing)
+    jerk_factor = self.lane_change_smoother.update(self.lane_change_pace, in_lane_change, CS.vEgo, new_desired_curvature,
+                                                   self.desired_curvature, DT_CTRL)
+    self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll, jerk_factor)
     lat_delay = self.sm["lateralDelay"].lateralDelay + LAT_SMOOTH_SECONDS
 
     actuators.curvature = self.desired_curvature

@@ -19,6 +19,8 @@ ICON = "icons_mici/settings.png"
 LKAS_ICON = "icons_mici/settings/device/lkas.png"
 
 LANE_CHANGE_CHOICES = [(-1, "off"), (0, "nudge"), (1, "nudgeless"), (2, "0.5 s"), (3, "1 s"), (4, "2 s"), (5, "3 s")]
+# LaneChangeSmoothing: how slowly the steering may change during a lane change, 1 is the smoothest, 10 leaves the stock limit
+LANE_CHANGE_SMOOTHING_CHOICES = [(1, "1 smoothest"), (3, "3"), (5, "5 default"), (7, "7"), (9, "9"), (10, "10 stock")]
 STEERING_ON_BRAKE_CHOICES = [(0, "remain active"), (1, "pause"), (2, "disengage")]
 BLINKER_DELAY_CHOICES = [(0, "0 s"), (1, "1 s"), (2, "2 s"), (3, "3 s"), (5, "5 s")]
 OFF_ON_CHOICES = [(0, "off"), (1, "on")]
@@ -61,6 +63,7 @@ def steering_panel() -> SettingsPanel:
 
 def lane_change_panel() -> SettingsPanel:
   return SettingsPanel([
+    BigChoiceParam("lane change\nsmoothness", "LaneChangeSmoothing", LANE_CHANGE_SMOOTHING_CHOICES),
     BigChoiceParam("auto lane\nchange", "AutoLaneChangeTimer", LANE_CHANGE_CHOICES),
     BigBoolParam("delay with\nblind spot", "AutoLaneChangeBsmDelay"),
     BigBoolParam("block at\nroad edge", "RoadEdgeLaneChangeEnabled"),
