@@ -148,7 +148,10 @@ class Controls(ControlsExt):
     else:
       new_desired_curvature = model_v2.action.desiredCurvature if CC.latActive else self.curvature
     if self.state_control_frame % 100 == 0:  # the setting is read once a second
-      self.lane_change_pace = self.params.get("LaneChangeSmoothing", return_default=True)
+      try:
+        self.lane_change_pace = int(self.params.get("LaneChangeSmoothing", return_default=True))
+      except Exception:
+        self.lane_change_pace = DEFAULT_PACE
     self.state_control_frame += 1
     in_lane_change = model_v2.meta.laneChangeState in (LaneChangeState.laneChangeStarting, LaneChangeState.laneChangeFinishing)
     jerk_factor = self.lane_change_smoother.update(self.lane_change_pace, in_lane_change, CS.vEgo, new_desired_curvature,

@@ -471,9 +471,12 @@ def main(demo=False):
       model.PLANPLUS_CONTROL = params.get("PlanplusControl", return_default=True)
       base_camera_offset = params.get("CameraOffset", return_default=True)
     if sm.frame % 10 == 0:
-      lane_mode = int(params.get("LanePosition", return_default=True))
-      if lane_mode != CENTER and not (sm["selfdriveState"].enabled or sm["selfdriveStateSP"].mads.active):
-        params.put("LanePosition", CENTER)  # back to the center as soon as openpilot is not steering
+      try:
+        lane_mode = int(params.get("LanePosition", return_default=True))
+        if lane_mode != CENTER and not (sm["selfdriveState"].enabled or sm["selfdriveStateSP"].mads.active):
+          params.put("LanePosition", CENTER)  # back to the center as soon as openpilot is not steering
+          lane_mode = CENTER
+      except Exception:
         lane_mode = CENTER
     camera_offset_helper.set_offset(base_camera_offset + lane_position.offset)
     lat_delay = model.lat_delay + model.LAT_SMOOTH_SECONDS

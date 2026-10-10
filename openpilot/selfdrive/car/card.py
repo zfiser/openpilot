@@ -90,6 +90,7 @@ class Car:
     self.car_clock: CarClock | None = None  # set once the brand is known
     self.daily_distance = DailyDistance(self.params, now=self._clock_now)
     self.raw_can_watch = RawCanWatch(self.params)
+    self._extra_data_failed = False
 
     self.can_callbacks = can_comm_callbacks(self.can_sock, self.pm.sock['sendcan'])
 
@@ -212,11 +213,16 @@ class Car:
     CS, CS_SP = self.CI.update(can_list)
     if self.car_clock is not None:
       self.car_clock.update(can_list)
-    if (today_item := self.daily_distance.update(CS_SP.carData)) is not None:
-      CS_SP.carData.append(today_item)
-      if (time_item := self.daily_distance.drive_time_item()) is not None:
-        CS_SP.carData.append(time_item)
-    CS_SP.carData.extend(self.raw_can_watch.update(can_list))
+    try:  # extra values for the car data page, a failure here must never stop the car process
+      if (today_item := self.daily_distance.update(CS_SP.carData)) is not None:
+        CS_SP.carData.append(today_item)
+        if (time_item := self.daily_distance.drive_time_item()) is not None:
+          CS_SP.carData.append(time_item)
+      CS_SP.carData.extend(self.raw_can_watch.update(can_list))
+    except Exception:
+      if not self._extra_data_failed:  # logged once, not 100 times a second
+        self._extra_data_failed = True
+        cloudlog.exception("car data extras failed")
     CS_SP = convert_to_capnp(CS_SP)
 
     # Update radar tracks from CAN
