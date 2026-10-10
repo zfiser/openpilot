@@ -214,6 +214,8 @@ class Car:
       self.car_clock.update(can_list)
     if (today_item := self.daily_distance.update(CS_SP.carData)) is not None:
       CS_SP.carData.append(today_item)
+      if (time_item := self.daily_distance.drive_time_item()) is not None:
+        CS_SP.carData.append(time_item)
     CS_SP.carData.extend(self.raw_can_watch.update(can_list))
     CS_SP = convert_to_capnp(CS_SP)
 

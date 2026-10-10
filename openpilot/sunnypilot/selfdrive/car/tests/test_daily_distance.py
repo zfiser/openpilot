@@ -14,14 +14,24 @@ class FakeParams:
   def __init__(self, stored=None):
     self.values = {PARAM: stored} if stored is not None else {}
     self.writes = 0
+    self.async_writes = 0  # the running time, not worth waiting for
 
   def get(self, key):
     return self.values.get(key)
 
   def put(self, key, value, block=False):
-    assert block, "the daily baseline must be written with block=True so it survives a power cut"
     self.values[key] = dict(value)
     self.writes += 1
+    if not block:
+      self.async_writes += 1
+
+
+class Mono:
+  def __init__(self):
+    self.t = 0.0
+
+  def __call__(self):
+    return self.t
 
 
 class Clock:
@@ -41,11 +51,12 @@ def odo(value, unit="km", valid=True):
 
 def make(stored=None, when=datetime.datetime(2026, 10, 6, 8, 0, tzinfo=datetime.UTC)):
   params, clock = FakeParams(stored), Clock(when)
-  return DailyDistance(params, now=clock, tz=datetime.UTC), params, clock
+  dd = DailyDistance(params, now=clock, tz=datetime.UTC, mono=Mono())
+  return dd, params, clock
 
 
-def stored(date="2026-10-06", start=10000.0, unit="km", last=None):
-  return {"date": date, "start": start, "unit": unit, "last": start if last is None else last}
+def stored(date="2026-10-06", start=10000.0, unit="km", last=None, seconds=0.0):
+  return {"date": date, "start": start, "unit": unit, "last": start if last is None else last, "seconds": seconds}
 
 
 class TestDailyDistance:
@@ -128,3 +139,74 @@ class TestDailyDistance:
     for bad in ("nonsense", {"date": "2026-10-06"}, {"start": 1}, 5):
       dd, _, _ = make(stored=bad)
       assert dd.update(odo(10000)).value == 0
+
+
+def make_timed(stored_state=None):
+  params, clock, mono = FakeParams(stored_state), Clock(datetime.datetime(2026, 10, 6, 8, 0, tzinfo=datetime.UTC)), Mono()
+  return DailyDistance(params, now=clock, tz=datetime.UTC, mono=mono), params, clock, mono
+
+
+def run(dd, mono, seconds, odometer=10000, step=1.0):
+  for _ in range(round(seconds / step)):
+    mono.t += step
+    dd.update(odo(odometer))
+
+
+class TestDriveTime:
+  def test_no_item_before_the_first_reading(self):
+    dd, _, _, _ = make_timed()
+    assert dd.drive_time_item() is None
+    dd.update(odo(10000, valid=False))
+    assert dd.drive_time_item() is None
+
+  def test_counts_the_time_the_car_is_on(self):
+    dd, _, _, mono = make_timed()
+    dd.update(odo(10000))
+    run(dd, mono, 125)
+    item = dd.drive_time_item()
+    assert item.key == "drive_time" and item.unit == "s" and item.valid and abs(item.value - 125) < 1e-6
+
+  def test_a_stall_counts_one_second_at_most(self):
+    dd, _, _, mono = make_timed()
+    dd.update(odo(10000))
+    mono.t += 900.0
+    dd.update(odo(10000))
+    assert dd.drive_time_item().value == 1.0
+
+  def test_resets_with_the_new_day(self):
+    dd, _, clock, mono = make_timed()
+    dd.update(odo(10000))
+    run(dd, mono, 300)
+    clock.when += datetime.timedelta(days=1)
+    dd.update(odo(10050))
+    assert dd.drive_time_item().value == 0.0
+
+  def test_the_time_survives_a_restart_on_the_same_day(self):
+    dd, params, _, mono = make_timed()
+    dd.update(odo(10000))
+    run(dd, mono, 130)  # stored at the second 60 and 120
+    dd2, _, _, mono2 = make_timed(params.values[PARAM])
+    dd2.update(odo(10000))
+    assert 119 <= dd2.drive_time_item().value <= 121
+    run(dd2, mono2, 30)
+    assert 149 <= dd2.drive_time_item().value <= 151
+
+  def test_written_once_a_minute_without_waiting(self):
+    dd, params, _, mono = make_timed()
+    dd.update(odo(10000))
+    params.writes = params.async_writes = 0
+    run(dd, mono, 59)
+    assert params.writes == 0
+    run(dd, mono, 2)
+    assert params.async_writes == 1 and params.writes == 1
+    run(dd, mono, 50)
+    assert params.async_writes == 1
+
+  def test_an_odometer_change_is_written_blocking_with_the_time(self):
+    dd, params, _, mono = make_timed()
+    dd.update(odo(10000))
+    run(dd, mono, 20)
+    params.writes = params.async_writes = 0
+    dd.update(odo(10001))
+    assert params.writes == 1 and params.async_writes == 0
+    assert abs(params.values[PARAM]["seconds"] - 20) < 1e-6
