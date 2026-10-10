@@ -54,8 +54,9 @@ class HudRendererSP(HudRenderer):
     self._draw_rpm(rect)
 
   def _draw_rpm(self, rect: rl.Rectangle) -> None:
-    """Engine RPM, top centre. Not drawn while the engine is off or the car does not report it."""
-    if self._rpm_text is None:
+    """Engine RPM, top centre. Not drawn while the engine is off or the car does not report it, nor while an alert is on
+    screen (changing lane, pay attention and so on), as the alert uses the same place."""
+    if self._rpm_text is None or not self._can_draw_top_icons:
       return
     # only the number is centred, the unit hangs off its right side and its bottom lines up with the number
     size = measure_text_cached(self._rpm_font, self._rpm_text, RPM_FONT_SIZE)
