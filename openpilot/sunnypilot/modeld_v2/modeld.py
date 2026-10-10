@@ -47,7 +47,7 @@ from openpilot.sunnypilot.modeld_v2.parse_model_outputs import Parser
 from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
-from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, LanePosition
+from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, LanePosition, near_lane_line_position
 from openpilot.sunnypilot.modeld_v2.compile_modeld import (derive_frame_skip, make_split_input_queues,
                                                            make_supercombo_input_queues, nv12_copy_size,
                                                            WARP_INPUTS, POLICY_INPUTS)
@@ -555,11 +555,13 @@ def main(demo=False):
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, live_calib_seen, meta_constants)
       modelv2_send.modelV2.big = model.chestnut
 
-      lane_lines, lane_probs = modelv2_send.modelV2.laneLines, modelv2_send.modelV2.laneLineProbs
-      if len(lane_lines) >= 3 and len(lane_probs) >= 3 and len(lane_lines[1].y) >= 3 and len(lane_lines[2].y) >= 3:
-        # the two lines next to the car, the first few points are the ones closest to it
-        lane_position.update(lane_mode, float(np.mean(lane_lines[1].y[:3])), float(np.mean(lane_lines[2].y[:3])),
-                             lane_probs[1], lane_probs[2], DT_MDL)
+      try:  # an optional feature, it must never take the driving model down
+        lane_lines, lane_probs = modelv2_send.modelV2.laneLines, modelv2_send.modelV2.laneLineProbs
+        left_y, right_y = near_lane_line_position(lane_lines[1].y), near_lane_line_position(lane_lines[2].y)
+        lane_position.update(lane_mode, left_y, right_y, lane_probs[1], lane_probs[2], DT_MDL)
+      except Exception:
+        cloudlog.exception("lane position update failed")
+        lane_position.update(CENTER, 0.0, 0.0, 0.0, 0.0, DT_MDL)  # drift back to the center
 
       desire_state = modelv2_send.modelV2.meta.desireState
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]

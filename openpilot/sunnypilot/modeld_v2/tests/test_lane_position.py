@@ -5,7 +5,7 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.sunnypilot.modeld_v2.lane_position import (CENTER, LEFT, RIGHT, CAR_WIDTH, SIDE_MARGIN, MAX_SHIFT, HOLD_SECONDS,
-                                                          LanePosition, target_shift)
+                                                          LanePosition, near_lane_line_position, target_shift)
 
 DT = 0.05
 
@@ -63,3 +63,33 @@ class TestLanePosition:
     settle(lp, LEFT)
     settle(lp, LEFT, right_p=0.1, seconds=2.0)
     assert abs(settle(lp, LEFT, seconds=2.0) - 0.45) < 1e-6
+
+
+class _NoSlice:
+  """Like a capnp list: indexing and length work, slicing does not."""
+
+  def __init__(self, values):
+    self._values = values
+
+  def __len__(self):
+    return len(self._values)
+
+  def __getitem__(self, i):
+    if not isinstance(i, int):
+      raise TypeError("an integer is required")
+    return self._values[i]
+
+
+class TestNearLaneLine:
+  def test_reads_a_list_that_cannot_be_sliced(self):
+    assert abs(near_lane_line_position(_NoSlice([1.7, 1.8, 1.9, 2.5])) - 1.8) < 1e-9
+
+  def test_fewer_points_than_asked(self):
+    assert near_lane_line_position(_NoSlice([1.5, 2.5])) == 2.0
+
+  def test_no_points_is_an_error(self):
+    try:
+      near_lane_line_position(_NoSlice([]))
+    except ValueError:
+      return
+    raise AssertionError("expected ValueError")

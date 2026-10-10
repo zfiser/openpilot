@@ -14,6 +14,15 @@ RATE = 0.12  # m/s, how fast the car moves sideways towards the target
 HOLD_SECONDS = 3.0  # keep the position for this long when the lane lines are lost, then go back to the center
 
 
+def near_lane_line_position(y_points, count: int = 3) -> float:
+  """Mean position of the first few points of a lane line, the ones closest to the car. y_points can be a capnp list, which
+  does not support slicing, so the points are read by index."""
+  n = min(count, len(y_points))
+  if n == 0:
+    raise ValueError("lane line without points")
+  return sum(float(y_points[i]) for i in range(n)) / n
+
+
 def target_shift(mode: int, left_y: float, right_y: float) -> float:
   """Offset from the center of the lane that leaves SIDE_MARGIN between the car and the line on the chosen side.
   left_y and right_y are the positions of the two lane lines next to the car (left positive), the lane width is their
