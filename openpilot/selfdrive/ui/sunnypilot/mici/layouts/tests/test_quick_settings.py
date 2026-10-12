@@ -49,7 +49,7 @@ class TestQuickSettings(unittest.TestCase):
 
   def test_choice_lists_have_unique_values_and_labels(self):
     for name in ("LANE_CHANGE_CHOICES", "LANE_CHANGE_SMOOTHING_CHOICES", "STEERING_ON_BRAKE_CHOICES", "BLINKER_DELAY_CHOICES", "OFF_ON_CHOICES",
-                 "TIMEOUT_CHOICES", "HUG_CM_CHOICES", "CENTER_OFFSET_CHOICES", "ONROAD_BRIGHTNESS_CHOICES", "SCREEN_SAVER_CHOICES"):
+                 "TIMEOUT_CHOICES", "HUG_CM_CHOICES", "CENTER_OFFSET_CHOICES", "MIN_LANE_WIDTH_CHOICES", "ONROAD_BRIGHTNESS_CHOICES", "SCREEN_SAVER_CHOICES"):
       choices = getattr(self.m, name)
       assert len({v for v, _ in choices}) == len(choices), name
       assert len({label for _, label in choices}) == len(choices), name
@@ -61,6 +61,7 @@ class TestQuickSettings(unittest.TestCase):
     assert dict(self.m.CENTER_OFFSET_CHOICES)[0] == "none" and dict(self.m.CENTER_OFFSET_CHOICES)[10] == "10 cm left"
     assert dict(self.m.CENTER_OFFSET_CHOICES)[-10] == "10 cm right"
     assert all(abs(v) * 0.01 <= 0.35 for v, _ in self.m.CENTER_OFFSET_CHOICES)  # the model setting allows 35 cm at most
+    assert (28, "2.8 m") in self.m.MIN_LANE_WIDTH_CHOICES and all(2.0 <= v / 10 <= 3.4 for v, _ in self.m.MIN_LANE_WIDTH_CHOICES)
     assert dict(self.m.STEERING_ON_BRAKE_CHOICES) == {0: "remain active", 1: "pause", 2: "disengage"}
     assert dict(self.m.ONROAD_BRIGHTNESS_CHOICES)[22] == "100 %" and dict(self.m.ONROAD_BRIGHTNESS_CHOICES)[4] == "10 %"
     assert (0, "default") in self.m.TIMEOUT_CHOICES and (120, "2 m") in self.m.TIMEOUT_CHOICES
