@@ -13,7 +13,7 @@ from openpilot.common.time_helpers import system_time_valid
 
 PARAM = "DailyOdometer"
 MAX_STEP = 1.0  # s, a longer gap between two updates (a stall) counts as one second
-TIME_SAVE_INTERVAL = 60.0  # s, how often the time is stored, not worth waiting for
+TIME_SAVE_INTERVAL = 300.0  # s, how often the running values are stored, not worth waiting for
 
 
 def device_now() -> datetime.datetime | None:
@@ -31,8 +31,11 @@ class DailyDistance:
   The odometer only counts whole units, so the value can be off by one.
 
   The time the car was on today is kept in the same entry ("seconds", reset together with the start): every update with a
-  valid odometer adds the time since the last one, so it counts the time the car process runs with the car on. It is stored
-  once a minute and with every odometer change, so a power cut loses at most a minute.
+  valid odometer adds the time since the last one, so it counts the time the car process runs with the car on.
+
+  Writing: the entry is written when a new day starts (the first reading of the day, once a day) and otherwise only every
+  few minutes with the running values (last odometer reading and seconds), never on every odometer change. All writes are
+  non-blocking, the car loop never waits for the disk. A power cut loses at most the last few minutes of time and distance.
 
   Neither clock may be known for the first minutes after a start (no car clock frame yet, no GPS fix or network).
   Counting starts anyway with the date unknown (None) and takes today's date as soon as a clock is available, so a
@@ -61,9 +64,8 @@ class DailyDistance:
       pass
     return None
 
-  def _save(self, block: bool = True) -> None:
-    # a new day, a new odometer unit or an odometer change are rare, wait until they are really stored
-    self._params.put(PARAM, self._state, block=block)
+  def _save(self) -> None:
+    self._params.put(PARAM, self._state, block=False)  # in the car loop: never wait for the disk
 
   def update(self, items):
     """Returns the 'today' item, or None while there is no valid odometer reading. Call with the brand's items."""
@@ -86,20 +88,14 @@ class DailyDistance:
       self._last_time_save = now_mono
       self._save()
     else:
-      changed = False
-      if today is not None and state["date"] is None:
+      date_found = today is not None and state["date"] is None
+      if date_found:
         state["date"] = today  # counting started before the clock was valid, assume that was today
-        changed = True
-      if odometer.value != state["last"]:
-        state["last"] = float(odometer.value)
-        changed = True
+      state["last"] = float(odometer.value)  # kept in memory, written with the next periodic save
       state["seconds"] = state.get("seconds", 0.0) + step
-      if changed:
+      if date_found or now_mono - self._last_time_save >= TIME_SAVE_INTERVAL:
         self._last_time_save = now_mono
         self._save()
-      elif now_mono - self._last_time_save >= TIME_SAVE_INTERVAL:
-        self._last_time_save = now_mono
-        self._save(block=False)
 
     return make_car_data_item("today", "Today", odometer.value - self._state["start"], odometer.unit)
 

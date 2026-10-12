@@ -580,14 +580,14 @@ def main(demo=False):
       try:  # a failure here falls back to the road edge flags
         if sm.frame % 60 == 0:
           min_lane_width = float(params.get("RoadEdgeMinLaneWidth", return_default=True))
-        if RELC.enabled:
+        if min_lane_width > 0.0:  # its own setting, works with or without the road edge block
           width_left, width_right = lane_widths.update(modelv2_send.modelV2.laneLines, modelv2_send.modelV2.roadEdges)
       except Exception:
         cloudlog.exception("lane width failed")
         width_left = width_right = None
       DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, left_edge, right_edge,
-                width_left, width_right, min_lane_width if RELC.enabled else 0.0)
-      if width_left is not None and RELC.enabled and min_lane_width > 0.0:
+                width_left, width_right, min_lane_width)
+      if width_left is not None and min_lane_width > 0.0:
         # the "no lane available" notice of selfdrived, only while an automatic lane change waits for a lane
         mdv2sp_send.modelDataV2SP.leftLaneChangeEdgeBlock = bool(DH.waiting_for_lane and DH.lane_change_direction == log.LaneChangeDirection.left)
         mdv2sp_send.modelDataV2SP.rightLaneChangeEdgeBlock = bool(DH.waiting_for_lane and DH.lane_change_direction == log.LaneChangeDirection.right)
