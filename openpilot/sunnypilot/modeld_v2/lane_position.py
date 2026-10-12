@@ -10,7 +10,7 @@ SIDE_MARGIN = 0.15  # m, the least that is kept between the side of the car and 
 MAX_SHIFT = 0.90  # m, never move further than this from the center of the lane
 DEFAULT_SHIFT = 0.70  # m, how far the car moves towards the line (the HugLeftCm and HugRightCm settings)
 MIN_LINE_PROB = 0.5  # both lane lines must be at least this sure, the lane width comes from them
-MIN_LANE_WIDTH = 2.6  # m, narrower than this is not a lane (a mistake of the model), stay centered
+MIN_LANE_WIDTH = 3.1  # m, in a narrower lane the car stays centered (also covers a mistake of the model)
 RATE = 0.12  # m/s, how fast the car moves sideways towards the target
 HOLD_SECONDS = 3.0  # keep the position for this long when the lane lines are lost, then go back to the center
 

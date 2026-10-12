@@ -36,7 +36,8 @@ class TestLanePosition:
 
   def test_narrow_lane_does_not_move(self):
     assert target_shift(LEFT, 1.1, -1.1) == 0.0  # 2.2 m, not a lane
-    assert abs(target_shift(LEFT, 1.35, -1.35)) < 1e-9  # 2.7 m: no room left once the margin is kept
+    assert target_shift(LEFT, 1.45, -1.45) == 0.0  # 2.9 m: too narrow to hug
+    assert target_shift(LEFT, 1.6, -1.6) > 0.2  # 3.2 m: wide enough, the room decides
 
   def test_center_is_zero(self):
     assert target_shift(CENTER, 1.8, -1.8) == 0.0
