@@ -119,9 +119,9 @@ def stored_items(state, today: str, live: dict | None = None) -> list:
   except Exception:
     return []
   today = max(last - start, 0.0)
-  return [SimpleNamespace(key="odometer", label="Odometer (last known)", value=last, unit=unit, valid=True),
-          SimpleNamespace(key="today", label="Today (last known)", value=today if same_day else 0.0, unit=unit, valid=True),
-          SimpleNamespace(key="drive_time", label="Time (last known)", value=seconds, unit="s", valid=True)]
+  return [SimpleNamespace(key="odometer", label="Odometer", value=last, unit=unit, valid=True),
+          SimpleNamespace(key="today", label="Today", value=today if same_day else 0.0, unit=unit, valid=True),
+          SimpleNamespace(key="drive_time", label="Time", value=seconds, unit="s", valid=True)]
 
 
 def voltage_item(sm):

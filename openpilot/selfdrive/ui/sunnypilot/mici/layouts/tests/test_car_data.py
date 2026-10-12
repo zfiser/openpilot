@@ -83,7 +83,7 @@ class TestCarData(unittest.TestCase):
     state = {"date": "2026-10-08", "start": 10000.0, "unit": "km", "last": 10042.0}
     odometer, today, _ = self.mod.stored_items(state, "2026-10-08")
     assert (odometer.key, odometer.value, odometer.unit, odometer.valid) == ("odometer", 10042.0, "km", True)
-    assert odometer.label == "Odometer (last known)" and today.label == "Today (last known)"
+    assert odometer.label == "Odometer" and today.label == "Today"
     assert (today.key, today.value, today.unit, today.valid) == ("today", 42.0, "km", True)
 
   def test_stored_items_a_new_day_starts_at_zero(self):
