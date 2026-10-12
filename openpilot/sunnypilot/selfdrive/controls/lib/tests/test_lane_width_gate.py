@@ -31,7 +31,7 @@ class TestLaneWidthGate(OpenpilotTestCase):
     self.dh = DesireHelper()
     self.dh.alc.lane_change_set_timer = AutoLaneChangeMode.NUDGELESS
     self.dh.alc.lane_change_bsm_delay = False
-    self.dh.alc.param_read_counter = 1  # keep the values set here, no reading of the settings
+    self.dh.alc.read_params = lambda: None  # keep the values set here, no reading of the settings
 
   def test_a_wide_lane_starts_at_once(self):
     run(self.dh, car(), 1.0)
@@ -75,7 +75,7 @@ class TestLaneWidthGate(OpenpilotTestCase):
     assert self.dh.lane_change_state == LaneChangeState.preLaneChange and not self.dh.waiting_for_lane
     dh2 = DesireHelper()
     dh2.alc.lane_change_set_timer = AutoLaneChangeMode.NUDGELESS
-    dh2.alc.param_read_counter = 1
+    dh2.alc.read_params = lambda: None
     for _ in range(60):
       dh2.update(car(), True, 1.0, True, False)  # old call without widths
     assert dh2.lane_change_state == LaneChangeState.preLaneChange
