@@ -58,7 +58,7 @@ if COMMA_HARDWARE:
         color.rgb = clamp((color.rgb - 0.5) * 1.2 + 0.5, 0.0, 1.0);  // +20% contrast
         color.rgb = pow(color.rgb, vec3(1.0/1.28));
         fragColor = vec4(color.rgb, color.a);
-      } else {
+      } else if (engaged == 0) {  // 2: the camera image as it is (sunnypilot)
         color.rgb *= 0.85;  // 85% opacity
       }
       if (enhance_driver == 1) {
@@ -88,7 +88,7 @@ else:
         float gray = dot(rgb, vec3(0.299, 0.587, 0.114));
         rgb = mix(vec3(gray), rgb, 0.2);  // 20% saturation
         rgb = clamp((rgb - 0.5) * 1.2 + 0.5, 0.0, 1.0);  // +20% contrast
-      } else {
+      } else if (engaged == 0) {  // 2: the camera image as it is (sunnypilot)
         rgb *= 0.85;  // 85% opacity
       }
       // TODO: the images out of camerad need some more correction and
@@ -321,7 +321,10 @@ class CameraView(Widget):
     rl.end_shader_mode()
 
   def _update_texture_color_filtering(self):
-    self._engaged_val[0] = 1 if ui_state.status != UIStatus.DISENGAGED else 0
+    if gui_app.sunnypilot_ui() and self._stream_type != VisionStreamType.VISION_STREAM_CABIN:
+      self._engaged_val[0] = 2  # natural colours and brightness, engaged or not
+    else:
+      self._engaged_val[0] = 1 if ui_state.status != UIStatus.DISENGAGED else 0
     rl.set_shader_value(self.shader, self._engaged_loc, self._engaged_val, rl.ShaderUniformDataType.SHADER_UNIFORM_INT)
     rl.set_shader_value(self.shader, self._enhance_driver_loc, self._enhance_driver_val, rl.ShaderUniformDataType.SHADER_UNIFORM_INT)
 
