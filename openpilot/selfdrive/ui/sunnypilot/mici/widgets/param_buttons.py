@@ -53,5 +53,8 @@ class BigChoiceParam(BigButton):
   def _handle_mouse_release(self, mouse_pos: MousePos) -> None:
     super()._handle_mouse_release(mouse_pos)
     value, label = next_choice(self._choices, self._current())
-    self._params.put(self._param, value * self._scale if self._scale != 1.0 else value, block=True)
+    try:
+      self._params.put(self._param, value * self._scale if self._scale != 1.0 else value, block=True)
+    except Exception:
+      return  # the setting is not known (before the reboot after an update), keep showing the old value
     self.set_value(label)

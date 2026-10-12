@@ -239,7 +239,10 @@ class _HugRow(Widget):
       if tile.x <= mouse_pos.x <= tile.x + tile.width and tile.y <= mouse_pos.y <= tile.y + tile.height:
         self._read_mode()
         self._mode = toggle_lane_position(self._mode, side)
-        ui_state.params.put("LanePosition", self._mode)
+        try:
+          ui_state.params.put("LanePosition", self._mode)
+        except Exception:
+          self._mode = LANE_CENTER  # the setting is not known (before the reboot after an update), nothing changes
         self._next_read = time.monotonic() + 1.0  # show what was pressed, not the value from before the write
         return
 
