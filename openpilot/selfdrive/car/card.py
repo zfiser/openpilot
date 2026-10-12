@@ -195,9 +195,6 @@ class Car:
     # card is driven by can recv, expected at 100Hz
     self.rk = Ratekeeper(100, print_delay_threshold=None)
 
-    # log fingerprint in sentry
-    sunnypilot_interfaces.log_fingerprint(self.CP)
-
   def _clock_now(self):
     """The car's own clock when it reports one, else the device clock (None while neither is valid)."""
     car_time = self.car_clock.now() if self.car_clock is not None else None
