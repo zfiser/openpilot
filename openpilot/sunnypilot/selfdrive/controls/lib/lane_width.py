@@ -29,3 +29,23 @@ def calculate_lane_width(lane_line1, lane_line2, road_edge=None) -> float:
   if distance_to_road_edge < distance_to_lane:
     return 0.0
   return float(distance_to_lane)
+
+
+UPDATE_EVERY = 4  # frames, like StarPilot: the width is measured every 4th model frame
+DEFAULT_MIN_LANE_WIDTH = 2.8  # m, the RoadEdgeMinLaneWidth setting
+
+
+class AdjacentLaneWidth:
+  """Width of the lane on the left and on the right of the car, refreshed every few frames. 0 means no lane."""
+
+  def __init__(self):
+    self.left = 0.0
+    self.right = 0.0
+    self._frame = 0
+
+  def update(self, lane_lines, road_edges) -> tuple[float, float]:
+    if self._frame % UPDATE_EVERY == 0:
+      self.left = calculate_lane_width(lane_lines[0], lane_lines[1], road_edges[0] if len(road_edges) > 0 else None)
+      self.right = calculate_lane_width(lane_lines[3], lane_lines[2], road_edges[1] if len(road_edges) > 1 else None)
+    self._frame += 1
+    return self.left, self.right

@@ -47,6 +47,7 @@ from openpilot.sunnypilot.modeld_v2.parse_model_outputs import Parser
 from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
+from openpilot.sunnypilot.selfdrive.controls.lib.lane_width import AdjacentLaneWidth, DEFAULT_MIN_LANE_WIDTH
 from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, DEFAULT_SHIFT, LanePosition, model_lines_to_left_positive, near_lane_line_position
 from openpilot.sunnypilot.modeld_v2.compile_modeld import (derive_frame_skip, make_split_input_queues,
                                                            make_supercombo_input_queues, nv12_copy_size,
@@ -428,6 +429,8 @@ def main(demo=False):
   DH = DesireHelper()
   meta_constants = load_meta_constants()
   RELC = RoadEdgeLaneChangeController()
+  lane_widths = AdjacentLaneWidth()  # StarPilot style: wait for a lane instead of blocking on a road edge
+  min_lane_width = DEFAULT_MIN_LANE_WIDTH
 
   while True:
     # Keep receiving frames until we are at least 1 frame ahead of previous extra frame
@@ -573,7 +576,21 @@ def main(demo=False):
       r_lane_change_prob = desire_state[log.Desire.laneChangeRight]
       lane_change_prob = l_lane_change_prob + r_lane_change_prob
       left_edge, right_edge = RELC.update_and_fill(modelv2_send.modelV2, mdv2sp_send.modelDataV2SP, v_ego)
-      DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, left_edge, right_edge)
+      width_left = width_right = None
+      try:  # a failure here falls back to the road edge flags
+        if sm.frame % 60 == 0:
+          min_lane_width = float(params.get("RoadEdgeMinLaneWidth", return_default=True))
+        if RELC.enabled:
+          width_left, width_right = lane_widths.update(modelv2_send.modelV2.laneLines, modelv2_send.modelV2.roadEdges)
+      except Exception:
+        cloudlog.exception("lane width failed")
+        width_left = width_right = None
+      DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, left_edge, right_edge,
+                width_left, width_right, min_lane_width if RELC.enabled else 0.0)
+      if width_left is not None and RELC.enabled and min_lane_width > 0.0:
+        # the "no lane available" notice of selfdrived, only while an automatic lane change waits for a lane
+        mdv2sp_send.modelDataV2SP.leftLaneChangeEdgeBlock = bool(DH.waiting_for_lane and DH.lane_change_direction == log.LaneChangeDirection.left)
+        mdv2sp_send.modelDataV2SP.rightLaneChangeEdgeBlock = bool(DH.waiting_for_lane and DH.lane_change_direction == log.LaneChangeDirection.right)
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
       mdv2sp_send.valid = modelv2_send.valid

@@ -28,17 +28,23 @@ class DesireHelper:
     self.alc = AutoLaneChangeController(self)
     self.lane_turn_controller = LaneTurnController(self)
     self.lane_turn_direction = TurnDirection.none
+    self.waiting_for_lane = False  # an automatic lane change is held back because the lane next to the car is too narrow
 
   @staticmethod
   def get_lane_change_direction(CS):
     return LaneChangeDirection.left if CS.leftBlinker else LaneChangeDirection.right
 
-  def update(self, carstate, lateral_active, lane_change_prob, left_edge_detected=False, right_edge_detected=False):
+  def update(self, carstate, lateral_active, lane_change_prob, left_edge_detected=False, right_edge_detected=False,
+             lane_width_left=None, lane_width_right=None, min_lane_width=0.0):
+    """lane_width_left/right (the width of the lane next to the car, 0 for none) with min_lane_width > 0 switch from the road
+    edge flags to the way StarPilot does it: an automatic start waits, with no alert and no cancel, until the lane next to the car
+    is wide enough, a nudge on the wheel goes ahead anyway, only the radar blind spot blocks hard."""
     self.alc.update_params()
     self.lane_turn_controller.update_params()
     v_ego = carstate.vEgo
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
+    self.waiting_for_lane = False  # set again below while an automatic start waits for a lane
 
     # Lane turn controller update
     self.lane_turn_controller.update_lane_turn(blindspot_left=carstate.leftBlindspot, blindspot_right=carstate.rightBlindspot,
@@ -64,8 +70,16 @@ class DesireHelper:
                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
                           (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right))
 
-        blindspot_detected = (((carstate.leftBlindspot or left_edge_detected) and self.lane_change_direction == LaneChangeDirection.left) or
-                              ((carstate.rightBlindspot or right_edge_detected) and self.lane_change_direction == LaneChangeDirection.right))
+        use_lane_width = min_lane_width > 0.0 and lane_width_left is not None and lane_width_right is not None
+        if use_lane_width:
+          blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
+                                (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
+          lane_width = lane_width_left if self.lane_change_direction == LaneChangeDirection.left else lane_width_right
+          self.waiting_for_lane = lane_width < min_lane_width
+        else:
+          blindspot_detected = (((carstate.leftBlindspot or left_edge_detected) and self.lane_change_direction == LaneChangeDirection.left) or
+                                ((carstate.rightBlindspot or right_edge_detected) and self.lane_change_direction == LaneChangeDirection.right))
+          self.waiting_for_lane = False
 
         self.alc.update_lane_change(blindspot_detected, carstate.brakePressed)
 
@@ -73,7 +87,7 @@ class DesireHelper:
           self.lane_change_state = LaneChangeState.off
           self.lane_change_direction = LaneChangeDirection.none
           self.lane_change_timer = 0.0
-        elif (torque_applied or self.alc.auto_lane_change_allowed) and not blindspot_detected:
+        elif (torque_applied or (self.alc.auto_lane_change_allowed and not self.waiting_for_lane)) and not blindspot_detected:
           self.lane_change_state = LaneChangeState.laneChangeStarting
           self.lane_change_timer = 0.0
 

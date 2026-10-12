@@ -30,8 +30,12 @@ class TestLaneWidth:
     # the shoulder: the road edge sits right beside the outer line
     assert calculate_lane_width(line(-1.8), line(-3.0), line(-2.9)) == 0.0
 
-  def test_a_road_edge_beyond_the_outer_line_keeps_the_lane(self):
-    assert abs(calculate_lane_width(line(-1.8), line(-5.4), line(-7.0)) - 3.6) < 1e-6
+  def test_a_road_edge_far_beyond_the_outer_line_keeps_the_lane(self):
+    assert abs(calculate_lane_width(line(-1.8), line(-5.4), line(-10.0)) - 3.6) < 1e-6
+
+  def test_a_road_edge_less_than_a_lane_width_beyond_the_outer_line_means_no_lane(self):
+    # StarPilot's rule: the edge has to be further from the outer line than the lane is wide
+    assert calculate_lane_width(line(-1.8), line(-5.4), line(-7.0)) == 0.0
 
   def test_a_split_the_gore_near_the_car_does_not_count(self):
     # a wide lane that opens up: narrow for the first 20 m, 3.6 m for the rest. The median looks at the whole length

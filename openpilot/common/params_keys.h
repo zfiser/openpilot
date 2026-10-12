@@ -40,6 +40,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LaneChangeSmoothing", {PERSISTENT | BACKUP, INT, "5"}},  // 1 smoothest .. 9, 10 stock
     {"HugLeftCm", {PERSISTENT | BACKUP, INT, "70"}},  // how far the car moves towards the left lane line, centimetres
     {"HugRightCm", {PERSISTENT | BACKUP, INT, "70"}},
+    {"RoadEdgeMinLaneWidth", {PERSISTENT | BACKUP, FLOAT, "2.8"}},  // m, the narrowest lane an automatic lane change waits for
     {"LanePosition", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, INT, "0"}},  // 1 hug the left lane line, -1 the right, 0 center
     {"DisengageOnAccelerator", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"DongleId", {PERSISTENT, STRING}},
