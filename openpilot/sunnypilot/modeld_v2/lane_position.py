@@ -23,6 +23,12 @@ def near_lane_line_position(y_points, count: int = 3) -> float:
   return sum(float(y_points[i]) for i in range(n)) / n
 
 
+def model_lines_to_left_positive(left_line_y: float, right_line_y: float) -> tuple[float, float]:
+  """The model reports y positive to the right (the left lane line is about -1.8, the right one +1.8), this module counts
+  positive to the left like the camera offset does."""
+  return -left_line_y, -right_line_y
+
+
 def target_shift(mode: int, left_y: float, right_y: float) -> float:
   """Offset from the center of the lane that leaves SIDE_MARGIN between the car and the line on the chosen side.
   left_y and right_y are the positions of the two lane lines next to the car (left positive), the lane width is their

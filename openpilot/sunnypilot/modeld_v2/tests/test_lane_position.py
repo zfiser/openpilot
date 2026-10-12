@@ -5,7 +5,7 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.sunnypilot.modeld_v2.lane_position import (CENTER, LEFT, RIGHT, CAR_WIDTH, SIDE_MARGIN, MAX_SHIFT, HOLD_SECONDS,
-                                                          LanePosition, near_lane_line_position, target_shift)
+                                                          LanePosition, model_lines_to_left_positive, near_lane_line_position, target_shift)
 
 DT = 0.05
 
@@ -93,3 +93,15 @@ class TestNearLaneLine:
     except ValueError:
       return
     raise AssertionError("expected ValueError")
+
+
+class TestModelFrame:
+  def test_real_lane_lines_give_a_shift(self):
+    # values from a recorded drive: left line -1.93, right line +1.55 (y positive to the right)
+    left, right = model_lines_to_left_positive(-1.93, 1.55)
+    assert (left, right) == (1.93, -1.55)
+    assert target_shift(LEFT, left, right) > 0.2
+    assert target_shift(RIGHT, left, right) < -0.2
+
+  def test_without_the_conversion_the_lane_would_look_negative(self):
+    assert target_shift(LEFT, -1.93, 1.55) == 0.0  # what the first version did: never moved
