@@ -6,8 +6,9 @@ See the LICENSE.md file in the root directory for more details.
 """
 LEFT, CENTER, RIGHT = 1, 0, -1  # the LanePosition setting, the sign is the side of the offset (positive moves the car left)
 CAR_WIDTH = 1.9  # m, body width
-SIDE_MARGIN = 0.40  # m kept between the side of the car and the lane line it hugs
-MAX_SHIFT = 0.60  # m, never move further than this from the center of the lane
+SIDE_MARGIN = 0.15  # m, the least that is kept between the side of the car and the lane line it hugs, whatever the setting says
+MAX_SHIFT = 0.90  # m, never move further than this from the center of the lane
+DEFAULT_SHIFT = 0.70  # m, how far the car moves towards the line (the HugLeftCm and HugRightCm settings)
 MIN_LINE_PROB = 0.5  # both lane lines must be at least this sure, the lane width comes from them
 MIN_LANE_WIDTH = 2.6  # m, narrower than this is not a lane (a mistake of the model), stay centered
 RATE = 0.12  # m/s, how fast the car moves sideways towards the target
@@ -29,8 +30,8 @@ def model_lines_to_left_positive(left_line_y: float, right_line_y: float) -> tup
   return -left_line_y, -right_line_y
 
 
-def target_shift(mode: int, left_y: float, right_y: float) -> float:
-  """Offset from the center of the lane that leaves SIDE_MARGIN between the car and the line on the chosen side.
+def target_shift(mode: int, left_y: float, right_y: float, left_shift: float = DEFAULT_SHIFT, right_shift: float = DEFAULT_SHIFT) -> float:
+  """Offset from the center of the lane: the wanted shift of the chosen side, but never closer to the line than SIDE_MARGIN.
   left_y and right_y are the positions of the two lane lines next to the car (left positive), the lane width is their
   difference, so it does not depend on the camera offset that is applied."""
   if mode == CENTER:
@@ -38,7 +39,9 @@ def target_shift(mode: int, left_y: float, right_y: float) -> float:
   width = left_y - right_y
   if width < MIN_LANE_WIDTH:
     return 0.0
-  shift = min(max(width / 2 - CAR_WIDTH / 2 - SIDE_MARGIN, 0.0), MAX_SHIFT)
+  room = max(width / 2 - CAR_WIDTH / 2 - SIDE_MARGIN, 0.0)
+  wanted = left_shift if mode == LEFT else right_shift
+  shift = min(max(wanted, 0.0), room, MAX_SHIFT)
   return shift if mode == LEFT else -shift
 
 
@@ -50,13 +53,14 @@ class LanePosition:
     self.offset = 0.0
     self._lost = 0.0
 
-  def update(self, mode: int, left_y: float, right_y: float, left_prob: float, right_prob: float, dt: float) -> float:
+  def update(self, mode: int, left_y: float, right_y: float, left_prob: float, right_prob: float, dt: float,
+             left_shift: float = DEFAULT_SHIFT, right_shift: float = DEFAULT_SHIFT) -> float:
     lines_ok = left_prob >= MIN_LINE_PROB and right_prob >= MIN_LINE_PROB
     if mode == CENTER:
       target = 0.0
       self._lost = 0.0
     elif lines_ok:
-      target = target_shift(mode, left_y, right_y)
+      target = target_shift(mode, left_y, right_y, left_shift, right_shift)
       self._lost = 0.0
     else:
       self._lost += dt

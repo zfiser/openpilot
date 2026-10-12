@@ -17,15 +17,22 @@ def settle(lp, mode, left_y=1.8, right_y=-1.8, left_p=0.9, right_p=0.9, seconds=
 
 
 class TestLanePosition:
-  def test_target_leaves_the_margin_to_the_line(self):
-    # a 3.6 m lane: 1.8 m to each line, half the car is 0.95 m, the margin 0.4 m: about 0.45 m of room to move
-    shift = target_shift(LEFT, 1.8, -1.8)
-    assert abs(shift - (1.8 - CAR_WIDTH / 2 - SIDE_MARGIN)) < 1e-9
-    assert target_shift(RIGHT, 1.8, -1.8) == -shift
+  def test_wanted_shift_when_there_is_room(self):
+    # a 3.6 m lane: 1.8 m to each line, half the car is 0.95 m: 0.85 m of room, minus the 0.15 m margin = 0.70 m
+    assert abs(target_shift(LEFT, 1.8, -1.8) - 0.70) < 1e-9
+    assert abs(target_shift(RIGHT, 1.8, -1.8) + 0.70) < 1e-9
+    assert abs(target_shift(LEFT, 1.8, -1.8, left_shift=0.4, right_shift=0.5) - 0.4) < 1e-9
+    assert abs(target_shift(RIGHT, 1.8, -1.8, left_shift=0.4, right_shift=0.5) + 0.5) < 1e-9
+
+  def test_never_closer_to_the_line_than_the_margin(self):
+    shift = target_shift(LEFT, 1.7, -1.7, left_shift=0.9)  # 3.4 m lane, 0.9 m wanted
+    assert abs(shift - (1.7 - CAR_WIDTH / 2 - SIDE_MARGIN)) < 1e-9
+    assert shift < 0.9
 
   def test_wide_lane_is_limited(self):
-    assert target_shift(LEFT, 3.0, -3.0) == MAX_SHIFT
-    assert target_shift(RIGHT, 3.0, -3.0) == -MAX_SHIFT
+    assert target_shift(LEFT, 3.0, -3.0, left_shift=2.0) == MAX_SHIFT
+    assert target_shift(RIGHT, 3.0, -3.0, right_shift=2.0) == -MAX_SHIFT
+    assert target_shift(LEFT, 3.0, -3.0, left_shift=-1.0) == 0.0
 
   def test_narrow_lane_does_not_move(self):
     assert target_shift(LEFT, 1.1, -1.1) == 0.0  # 2.2 m, not a lane
@@ -38,31 +45,35 @@ class TestLanePosition:
     lp = LanePosition()
     first = lp.update(LEFT, 1.8, -1.8, 0.9, 0.9, DT)
     assert 0 < first <= 0.12 * DT + 1e-9
-    assert abs(settle(lp, LEFT) - 0.45) < 1e-6
+    lp2 = LanePosition()
+    for _ in range(round(30 / DT)):
+      lp2.update(RIGHT, 1.8, -1.8, 0.9, 0.9, DT, left_shift=0.2, right_shift=0.3)
+    assert abs(lp2.offset + 0.3) < 1e-6  # each side has its own value
+    assert abs(settle(lp, LEFT) - 0.70) < 1e-6
 
   def test_hugging_right_goes_negative_and_back_to_center(self):
     lp = LanePosition()
-    assert settle(lp, RIGHT) < -0.4
+    assert settle(lp, RIGHT) < -0.65
     assert abs(settle(lp, CENTER)) < 1e-6
 
   def test_switching_sides_passes_through_the_center_at_the_same_speed(self):
     lp = LanePosition()
     settle(lp, LEFT)
     lp.update(RIGHT, 1.8, -1.8, 0.9, 0.9, DT)
-    assert lp.offset < 0.45  # already on its way over, never a jump
+    assert lp.offset < 0.70  # already on its way over, never a jump
 
   def test_lines_lost_keeps_the_position_then_returns_to_the_center(self):
     lp = LanePosition()
     settle(lp, LEFT)
     held = settle(lp, LEFT, left_p=0.1, seconds=HOLD_SECONDS - 0.5)
-    assert abs(held - 0.45) < 1e-6
+    assert abs(held - 0.70) < 1e-6
     assert abs(settle(lp, LEFT, left_p=0.1, seconds=20.0)) < 1e-6
 
   def test_lines_back_before_the_hold_ends_keep_the_mode(self):
     lp = LanePosition()
     settle(lp, LEFT)
     settle(lp, LEFT, right_p=0.1, seconds=2.0)
-    assert abs(settle(lp, LEFT, seconds=2.0) - 0.45) < 1e-6
+    assert abs(settle(lp, LEFT, seconds=2.0) - 0.70) < 1e-6
 
 
 class _NoSlice:

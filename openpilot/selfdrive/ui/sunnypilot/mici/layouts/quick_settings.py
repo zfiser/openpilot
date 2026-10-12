@@ -29,6 +29,10 @@ TIMEOUT_CHOICES = [(0, "default"), (30, "30 s"), (60, "1 m"), (90, "90 s"), (120
 ONROAD_BRIGHTNESS_CHOICES = [(0, "auto"), (1, "auto dark"), (2, "screen off"), (4, "10 %"), (6, "20 %"), (8, "30 %"),
                              (12, "50 %"), (22, "100 %")]
 SCREEN_SAVER_CHOICES = [(60, "1 m"), (120, "2 m"), (180, "3 m"), (300, "5 m"), (600, "10 m")]
+HUG_CM_CHOICES = [(20, "20 cm"), (30, "30 cm"), (40, "40 cm"), (50, "50 cm"), (60, "60 cm"), (70, "70 cm"), (80, "80 cm"), (90, "90 cm")]
+# CameraOffset in metres, positive moves the car to the left: a permanent shift of the center, in steps of 10 cm
+CENTER_OFFSET_CHOICES = [(-30, "30 cm right"), (-20, "20 cm right"), (-10, "10 cm right"), (0, "none"), (10, "10 cm left"),
+                         (20, "20 cm left"), (30, "30 cm left")]
 BLINKER_SPEEDS = (0, 20, 30, 40, 50, 60, 80, 100)
 
 
@@ -50,6 +54,17 @@ class SettingsPanel(NavScroller):
     for item in self._items:
       if hasattr(item, "refresh"):
         item.refresh()
+
+
+def hug_panel() -> SettingsPanel:
+  return SettingsPanel([
+    BigChoiceParam("hug left
+distance", "HugLeftCm", HUG_CM_CHOICES),
+    BigChoiceParam("hug right
+distance", "HugRightCm", HUG_CM_CHOICES),
+    BigChoiceParam("center
+position", "CameraOffset", CENTER_OFFSET_CHOICES, scale=0.01),
+  ])
 
 
 def steering_panel() -> SettingsPanel:
@@ -125,6 +140,7 @@ class TogglesMenu(NavScroller):
   def __init__(self):
     super().__init__()
     entries: list[tuple[str, str, Callable[[], NavScroller]]] = [
+      ("hug", LKAS_ICON, hug_panel),
       ("steering", LKAS_ICON, steering_panel),
       ("lane change", ICON, lane_change_panel),
       ("blinker", ICON, blinker_panel),

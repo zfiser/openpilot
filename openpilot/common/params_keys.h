@@ -38,6 +38,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"ShowBrakeDot", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"ShowRpm", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"LaneChangeSmoothing", {PERSISTENT | BACKUP, INT, "5"}},  // 1 smoothest .. 9, 10 stock
+    {"HugLeftCm", {PERSISTENT | BACKUP, INT, "70"}},  // how far the car moves towards the left lane line, centimetres
+    {"HugRightCm", {PERSISTENT | BACKUP, INT, "70"}},
     {"LanePosition", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, INT, "0"}},  // 1 hug the left lane line, -1 the right, 0 center
     {"DisengageOnAccelerator", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"DongleId", {PERSISTENT, STRING}},

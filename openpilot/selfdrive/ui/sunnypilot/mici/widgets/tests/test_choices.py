@@ -39,3 +39,12 @@ class TestChoices(unittest.TestCase):
 
 if __name__ == "__main__":
   unittest.main()
+
+
+class TestScaled:
+  def test_cm_choices_against_a_value_in_metres(self):
+    # the way BigChoiceParam stores and reads a scaled setting: cm times 0.01, read back with rounding
+    scale = 0.01
+    stored = [round(cm * scale, 2) for cm in (-30, -10, 0, 10, 30)]
+    assert stored == [-0.3, -0.1, 0.0, 0.1, 0.3]
+    assert [round(v / scale) for v in stored] == [-30, -10, 0, 10, 30]

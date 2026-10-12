@@ -28,9 +28,11 @@ class BigBoolParam(BigParamControl):
 class BigChoiceParam(BigButton):
   """A button for an integer setting: it shows the current choice under the title and steps to the next one on every tap."""
 
-  def __init__(self, text: str, param: str, choices: list[Choice]):
+  def __init__(self, text: str, param: str, choices: list[Choice], scale: float = 1.0):
+    """scale: the stored value is the choice times this, for example 0.01 for a setting in metres with choices in centimetres."""
     super().__init__(text, "")
     self._param = param
+    self._scale = scale
     self._params = Params()
     self._base_choices = choices
     self._choices = list(choices)
@@ -39,7 +41,7 @@ class BigChoiceParam(BigButton):
   def _current(self) -> int | None:
     try:
       value = self._params.get(self._param, return_default=True)
-      return None if value is None else int(float(value))
+      return None if value is None else round(float(value) / self._scale)
     except Exception:
       return None
 
@@ -51,5 +53,5 @@ class BigChoiceParam(BigButton):
   def _handle_mouse_release(self, mouse_pos: MousePos) -> None:
     super()._handle_mouse_release(mouse_pos)
     value, label = next_choice(self._choices, self._current())
-    self._params.put(self._param, value, block=True)
+    self._params.put(self._param, value * self._scale if self._scale != 1.0 else value, block=True)
     self.set_value(label)
