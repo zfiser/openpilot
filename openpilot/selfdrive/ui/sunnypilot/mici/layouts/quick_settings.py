@@ -58,12 +58,9 @@ class SettingsPanel(NavScroller):
 
 def hug_panel() -> SettingsPanel:
   return SettingsPanel([
-    BigChoiceParam("hug left
-distance", "HugLeftCm", HUG_CM_CHOICES),
-    BigChoiceParam("hug right
-distance", "HugRightCm", HUG_CM_CHOICES),
-    BigChoiceParam("center
-position", "CameraOffset", CENTER_OFFSET_CHOICES, scale=0.01),
+    BigChoiceParam("hug left\ndistance", "HugLeftCm", HUG_CM_CHOICES),
+    BigChoiceParam("hug right\ndistance", "HugRightCm", HUG_CM_CHOICES),
+    BigChoiceParam("center\nposition", "CameraOffset", CENTER_OFFSET_CHOICES, scale=0.01),
   ])
 
 
