@@ -70,10 +70,10 @@ class TestDailyDistance:
     dd, params, _ = make()
     dd.update(odo(10000))
     assert dd.update(odo(10042)).value == 42
-    assert params.values[PARAM] == stored(last=10042.0)
-    assert params.writes == 2  # the baseline and the one new reading, not one write per frame
+    assert params.writes == 1  # only the baseline of the day, an odometer change does not write
+    assert params.async_writes == params.writes  # never waits for the disk
     dd.update(odo(10042))
-    assert params.writes == 2
+    assert params.writes == 1
 
   def test_survives_a_restart_on_the_same_day(self):
     dd, _, _ = make(stored=stored(last=10010.0))
@@ -184,29 +184,39 @@ class TestDriveTime:
   def test_the_time_survives_a_restart_on_the_same_day(self):
     dd, params, _, mono = make_timed()
     dd.update(odo(10000))
-    run(dd, mono, 130)  # stored at the second 60 and 120
+    run(dd, mono, 330)  # stored at the 300th second
     dd2, _, _, mono2 = make_timed(params.values[PARAM])
     dd2.update(odo(10000))
-    assert 119 <= dd2.drive_time_item().value <= 121
+    assert 299 <= dd2.drive_time_item().value <= 301
     run(dd2, mono2, 30)
-    assert 149 <= dd2.drive_time_item().value <= 151
+    assert 329 <= dd2.drive_time_item().value <= 331
 
-  def test_written_once_a_minute_without_waiting(self):
+  def test_running_values_written_every_five_minutes_without_waiting(self):
     dd, params, _, mono = make_timed()
     dd.update(odo(10000))
     params.writes = params.async_writes = 0
-    run(dd, mono, 59)
+    run(dd, mono, 299)
     assert params.writes == 0
     run(dd, mono, 2)
     assert params.async_writes == 1 and params.writes == 1
-    run(dd, mono, 50)
-    assert params.async_writes == 1
+    run(dd, mono, 250)
+    assert params.writes == 1
 
-  def test_an_odometer_change_is_written_blocking_with_the_time(self):
+  def test_an_odometer_change_does_not_write(self):
     dd, params, _, mono = make_timed()
     dd.update(odo(10000))
     run(dd, mono, 20)
     params.writes = params.async_writes = 0
-    dd.update(odo(10001))
-    assert params.writes == 1 and params.async_writes == 0
-    assert abs(params.values[PARAM]["seconds"] - 20) < 1e-6
+    for km in range(10001, 10010):
+      dd.update(odo(km))
+    assert params.writes == 0
+    assert dd.update(odo(10010)).value == 10  # counted in memory
+
+  def test_the_baseline_is_written_once_per_day_without_waiting(self):
+    dd, params, clock, mono = make_timed()
+    dd.update(odo(10000))
+    run(dd, mono, 60, odometer=10003)
+    assert params.writes == 1 and params.async_writes == 1
+    clock.when += datetime.timedelta(days=1)
+    dd.update(odo(10050))
+    assert params.writes == 2 and params.async_writes == 2 and params.values[PARAM]["start"] == 10050.0
