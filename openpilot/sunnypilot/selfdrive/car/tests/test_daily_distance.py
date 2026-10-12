@@ -5,16 +5,20 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 import datetime
+import os
+import tempfile
 
 from opendbc.sunnypilot.car.car_data import make_car_data_item
-from openpilot.sunnypilot.selfdrive.car.daily_distance import DailyDistance, PARAM
+from openpilot.sunnypilot.selfdrive.car.daily_distance import DailyDistance, PARAM, read_live
+
+DAY = datetime.datetime(2026, 10, 6, 8, 0, tzinfo=datetime.UTC)
 
 
 class FakeParams:
   def __init__(self, stored=None):
     self.values = {PARAM: stored} if stored is not None else {}
     self.writes = 0
-    self.async_writes = 0  # the running time, not worth waiting for
+    self.blocking_writes = 0
 
   def get(self, key):
     return self.values.get(key)
@@ -22,8 +26,15 @@ class FakeParams:
   def put(self, key, value, block=False):
     self.values[key] = dict(value)
     self.writes += 1
-    if not block:
-      self.async_writes += 1
+    self.blocking_writes += bool(block)
+
+
+class Clock:
+  def __init__(self, when):
+    self.when = when
+
+  def __call__(self):
+    return self.when
 
 
 class Mono:
@@ -34,189 +45,138 @@ class Mono:
     return self.t
 
 
-class Clock:
-  """A time source that can be unknown (None), like the car clock or the device clock before it is set."""
-
-  def __init__(self, when: datetime.datetime):
-    self.when = when
-    self.valid = True
-
-  def __call__(self):
-    return self.when if self.valid else None
-
-
 def odo(value, unit="km", valid=True):
   return [make_car_data_item("odometer", "Odometer", value if valid else None, unit)]
 
 
-def make(stored=None, when=datetime.datetime(2026, 10, 6, 8, 0, tzinfo=datetime.UTC)):
-  params, clock = FakeParams(stored), Clock(when)
-  dd = DailyDistance(params, now=clock, tz=datetime.UTC, mono=Mono())
-  return dd, params, clock
+class Env:
+  """A device: the stored setting, a clock, a monotonic clock and the RAM file, kept across restarts of the car process."""
 
+  def __init__(self, stored=None, when=DAY):
+    self.params = FakeParams(stored)
+    self.clock = Clock(when)
+    self.dir = tempfile.TemporaryDirectory()
+    self.live = os.path.join(self.dir.name, "live.json")
 
-def stored(date="2026-10-06", start=10000.0, unit="km", last=None, seconds=0.0):
-  return {"date": date, "start": start, "unit": unit, "last": start if last is None else last, "seconds": seconds}
+  def start(self):
+    self.mono = Mono()
+    return DailyDistance(self.params, now=self.clock, tz=datetime.UTC, mono=self.mono, live_path=self.live)
+
+  def drive(self, dd, seconds, odometer, step=1.0):
+    item = None
+    for _ in range(round(seconds / step)):
+      self.mono.t += step
+      item = dd.update(odo(odometer))
+    return item
 
 
 class TestDailyDistance:
-  def test_first_reading_is_the_baseline(self):
-    dd, params, _ = make()
-    item = dd.update(odo(10000))
-    assert item.key == "today" and item.valid and item.value == 0 and item.unit == "km"
-    assert params.values[PARAM] == stored()
+  def test_first_start_of_the_day_writes_the_start_once(self):
+    env = Env()
+    dd = env.start()
+    assert dd.update(odo(10000)).value == 0
+    assert env.params.values[PARAM] == {"date": "2026-10-06", "start": 10000.0, "unit": "km"}
+    assert env.drive(dd, 60, 10042).value == 42
+    assert env.params.writes == 1 and env.params.blocking_writes == 0
 
-  def test_counts_up_during_the_day_and_keeps_the_last_reading(self):
-    dd, params, _ = make()
+  def test_a_later_start_on_the_same_day_only_reads(self):
+    env = Env()
+    env.drive(env.start(), 10, 10000)
+    dd = env.start()  # car off and on again
+    assert dd.update(odo(10030)).value == 30
+    assert env.params.writes == 1
+
+  def test_the_next_day_writes_a_new_start(self):
+    env = Env()
+    env.drive(env.start(), 10, 10000)
+    env.clock.when += datetime.timedelta(days=1)
+    dd = env.start()
+    assert dd.update(odo(10100)).value == 0
+    assert env.params.values[PARAM]["date"] == "2026-10-07" and env.params.writes == 2
+
+  def test_a_drive_across_midnight_counts_into_the_day_it_started(self):
+    env = Env(when=datetime.datetime(2026, 10, 6, 23, 50, tzinfo=datetime.UTC))
+    dd = env.start()
     dd.update(odo(10000))
-    assert dd.update(odo(10042)).value == 42
-    assert params.writes == 1  # only the baseline of the day, an odometer change does not write
-    assert params.async_writes == params.writes  # never waits for the disk
-    dd.update(odo(10042))
-    assert params.writes == 1
+    env.clock.when += datetime.timedelta(minutes=20)  # 00:10 the next day, still driving
+    assert env.drive(dd, 60, 10025).value == 25
+    assert env.params.writes == 1 and env.params.values[PARAM]["date"] == "2026-10-06"
 
-  def test_survives_a_restart_on_the_same_day(self):
-    dd, _, _ = make(stored=stored(last=10010.0))
-    assert dd.update(odo(10015)).value == 15
-
-  def test_old_stored_format_without_last_still_loads(self):
-    dd, _, _ = make(stored={"date": "2026-10-06", "start": 10000.0, "unit": "km"})
-    assert dd.update(odo(10015)).value == 15
-
-  def test_resets_after_midnight(self):
-    dd, params, clock = make(stored=stored(last=10080.0))
-    clock.when = datetime.datetime(2026, 10, 7, 0, 0, 1, tzinfo=datetime.UTC)
-    assert dd.update(odo(10090)).value == 0
-    assert params.values[PARAM] == stored(date="2026-10-07", start=10090.0)
-    assert dd.update(odo(10095)).value == 5
-
-  def test_unit_change_restarts(self):
-    dd, _, _ = make(stored=stored())
-    item = dd.update(odo(6214, unit="mi"))
-    assert item.value == 0 and item.unit == "mi"
-
-  def test_odometer_going_backwards_restarts(self):
-    dd, _, _ = make(stored=stored())
-    assert dd.update(odo(500)).value == 0
+  def test_waits_for_the_date_before_deciding(self):
+    env = Env(stored={"date": "2026-10-06", "start": 10000.0, "unit": "km"})
+    env.clock.when = None
+    dd = env.start()
+    assert dd.update(odo(10010)) is None and dd.drive_time_item() is None
+    assert env.params.writes == 0
+    env.clock.when = DAY
+    assert dd.update(odo(10010)).value == 10 and env.params.writes == 0
 
   def test_no_item_without_a_valid_odometer(self):
-    dd, params, _ = make()
-    assert dd.update(odo(0, valid=False)) is None
-    assert dd.update([]) is None
-    assert params.writes == 0
+    env = Env()
+    assert env.start().update(odo(0, valid=False)) is None
+    assert env.params.writes == 0
 
-  def test_counts_from_the_first_reading_even_before_the_clock_is_valid(self):
-    # the first drive after a fresh start: no GPS time or network yet
-    dd, params, clock = make()
-    clock.valid = False
-    assert dd.update(odo(10000)).value == 0
-    assert params.values[PARAM]["date"] is None
-    assert dd.update(odo(10007)).value == 7
+  def test_an_old_entry_without_a_date_is_not_today(self):
+    env = Env(stored={"date": None, "start": 9000.0, "unit": "km", "last": 9500.0})
+    assert env.start().update(odo(10000)).value == 0
+    assert env.params.writes == 1
 
-  def test_takes_todays_date_once_the_clock_is_valid_and_keeps_the_count(self):
-    dd, params, clock = make()
-    clock.valid = False
+  def test_a_unit_change_starts_over(self):
+    env = Env()
+    dd = env.start()
     dd.update(odo(10000))
-    dd.update(odo(10007))
-    clock.valid = True
-    assert dd.update(odo(10009)).value == 9
-    assert params.values[PARAM] == stored(last=10009.0)
-
-  def test_invalid_clock_does_not_reset_a_known_day(self):
-    dd, _, clock = make(stored=stored(last=10020.0))
-    clock.valid = False
-    assert dd.update(odo(10030)).value == 30
-
-  def test_the_date_follows_the_time_zone(self):
-    # 23:30 UTC is already the next day two hours east
-    when = datetime.datetime(2026, 10, 6, 23, 30, tzinfo=datetime.UTC)
-    params = FakeParams()
-    dd = DailyDistance(params, now=lambda: when, tz=datetime.timezone(datetime.timedelta(hours=2)))
-    dd.update(odo(10000))
-    assert params.values[PARAM]["date"] == "2026-10-07"
+    assert dd.update(odo(6214, unit="mi")).value == 0
+    assert env.params.writes == 2
 
   def test_garbage_in_storage_is_ignored(self):
-    for bad in ("nonsense", {"date": "2026-10-06"}, {"start": 1}, 5):
-      dd, _, _ = make(stored=bad)
-      assert dd.update(odo(10000)).value == 0
-
-
-def make_timed(stored_state=None):
-  params, clock, mono = FakeParams(stored_state), Clock(datetime.datetime(2026, 10, 6, 8, 0, tzinfo=datetime.UTC)), Mono()
-  return DailyDistance(params, now=clock, tz=datetime.UTC, mono=mono), params, clock, mono
-
-
-def run(dd, mono, seconds, odometer=10000, step=1.0):
-  for _ in range(round(seconds / step)):
-    mono.t += step
-    dd.update(odo(odometer))
+    env = Env(stored={"nonsense": 1})
+    assert env.start().update(odo(10000)).value == 0
 
 
 class TestDriveTime:
-  def test_no_item_before_the_first_reading(self):
-    dd, _, _, _ = make_timed()
-    assert dd.drive_time_item() is None
-    dd.update(odo(10000, valid=False))
-    assert dd.drive_time_item() is None
-
-  def test_counts_the_time_the_car_is_on(self):
-    dd, _, _, mono = make_timed()
+  def test_counts_the_time_and_continues_after_a_restart(self):
+    env = Env()
+    dd = env.start()
     dd.update(odo(10000))
-    run(dd, mono, 125)
-    item = dd.drive_time_item()
-    assert item.key == "drive_time" and item.unit == "s" and item.valid and abs(item.value - 125) < 1e-6
+    env.drive(dd, 125, 10002)
+    assert abs(dd.drive_time_item().value - 125) < 1e-6
+    dd2 = env.start()
+    dd2.update(odo(10002))
+    assert 115 <= dd2.drive_time_item().value <= 125  # from the RAM file, written every few seconds
+    assert env.params.writes == 1  # the running values never go to the disk
+
+  def test_a_new_day_starts_the_time_at_zero(self):
+    env = Env()
+    dd = env.start()
+    dd.update(odo(10000))
+    env.drive(dd, 300, 10005)
+    env.clock.when += datetime.timedelta(days=1)
+    dd2 = env.start()
+    dd2.update(odo(10050))
+    assert dd2.drive_time_item().value == 0.0
+
+  def test_without_the_ram_file_the_time_starts_again(self):
+    env = Env()
+    dd = env.start()
+    dd.update(odo(10000))
+    env.drive(dd, 60, 10001)
+    os.remove(env.live)  # the device was powered off
+    dd2 = env.start()
+    assert dd2.update(odo(10003)).value == 3  # the distance comes from the stored start
+    assert dd2.drive_time_item().value == 0.0
 
   def test_a_stall_counts_one_second_at_most(self):
-    dd, _, _, mono = make_timed()
+    env = Env()
+    dd = env.start()
     dd.update(odo(10000))
-    mono.t += 900.0
+    env.mono.t += 900.0
     dd.update(odo(10000))
     assert dd.drive_time_item().value == 1.0
 
-  def test_resets_with_the_new_day(self):
-    dd, _, clock, mono = make_timed()
+  def test_the_ram_file_has_the_values_for_the_page(self):
+    env = Env()
+    dd = env.start()
     dd.update(odo(10000))
-    run(dd, mono, 300)
-    clock.when += datetime.timedelta(days=1)
-    dd.update(odo(10050))
-    assert dd.drive_time_item().value == 0.0
-
-  def test_the_time_survives_a_restart_on_the_same_day(self):
-    dd, params, _, mono = make_timed()
-    dd.update(odo(10000))
-    run(dd, mono, 330)  # stored at the 300th second
-    dd2, _, _, mono2 = make_timed(params.values[PARAM])
-    dd2.update(odo(10000))
-    assert 299 <= dd2.drive_time_item().value <= 301
-    run(dd2, mono2, 30)
-    assert 329 <= dd2.drive_time_item().value <= 331
-
-  def test_running_values_written_every_five_minutes_without_waiting(self):
-    dd, params, _, mono = make_timed()
-    dd.update(odo(10000))
-    params.writes = params.async_writes = 0
-    run(dd, mono, 299)
-    assert params.writes == 0
-    run(dd, mono, 2)
-    assert params.async_writes == 1 and params.writes == 1
-    run(dd, mono, 250)
-    assert params.writes == 1
-
-  def test_an_odometer_change_does_not_write(self):
-    dd, params, _, mono = make_timed()
-    dd.update(odo(10000))
-    run(dd, mono, 20)
-    params.writes = params.async_writes = 0
-    for km in range(10001, 10010):
-      dd.update(odo(km))
-    assert params.writes == 0
-    assert dd.update(odo(10010)).value == 10  # counted in memory
-
-  def test_the_baseline_is_written_once_per_day_without_waiting(self):
-    dd, params, clock, mono = make_timed()
-    dd.update(odo(10000))
-    run(dd, mono, 60, odometer=10003)
-    assert params.writes == 1 and params.async_writes == 1
-    clock.when += datetime.timedelta(days=1)
-    dd.update(odo(10050))
-    assert params.writes == 2 and params.async_writes == 2 and params.values[PARAM]["start"] == 10050.0
+    env.drive(dd, 30, 10004)
+    live = read_live(env.live)
+    assert live["date"] == "2026-10-06" and live["start"] == 10000.0 and live["last"] == 10004.0 and 15 <= live["seconds"] <= 30

@@ -95,6 +95,21 @@ class TestCarData(unittest.TestCase):
     assert self.mod.stored_items({"date": None, "start": 5.0, "unit": "km", "last": 9.0}, "2026-10-08")[1].value == 4.0
     assert self.mod.stored_items({"date": "2026-10-08", "start": 5.0, "unit": "km"}, "2026-10-08")[1].value == 0.0
 
+  def test_stored_items_use_the_ram_file_of_the_same_day(self):
+    state = {"date": "2026-10-08", "start": 10000.0, "unit": "km"}  # the new format: only the start of the day
+    live = {"date": "2026-10-08", "start": 10000.0, "unit": "km", "last": 10031.0, "seconds": 2700.0}
+    items = {i.key: i for i in self.mod.stored_items(state, "2026-10-08", live)}
+    assert items["today"].value == 31.0 and items["odometer"].value == 10031.0 and items["drive_time"].value == 2700.0
+
+  def test_stored_items_ignore_a_ram_file_of_another_day(self):
+    state = {"date": "2026-10-08", "start": 10000.0, "unit": "km"}
+    live = {"date": "2026-10-07", "start": 9900.0, "unit": "km", "last": 10000.0, "seconds": 900.0}
+    items = {i.key: i for i in self.mod.stored_items(state, "2026-10-08", live)}
+    assert items["today"].value == 0.0 and items["drive_time"].value == 0.0
+
+  def test_read_live_missing_or_broken(self):
+    assert self.mod.read_live("/nonexistent/live.json") is None
+
   def test_stored_items_garbage(self):
     for bad in (None, "x", 5, {}, {"start": "a", "unit": "km"}):
       assert self.mod.stored_items(bad, "2026-10-08") == []

@@ -5,6 +5,7 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 import datetime
+import json
 import time
 from types import SimpleNamespace
 
@@ -91,18 +92,33 @@ def rows_of(items: list, columns: int = COLUMNS) -> list[list]:
   return [items[i:i + columns] for i in range(0, len(items), columns)]
 
 
-def stored_items(state, today: str) -> list:
-  """Last known odometer and the distance of today from the stored DailyOdometer, shown while the car is off.
-  A stored day that is not today means nothing was driven yet today."""
+LIVE_PATH = "/dev/shm/daily_odometer_live.json"  # the running values of the car process, in RAM (see daily_distance.py)
+
+
+def read_live(path: str = LIVE_PATH) -> dict | None:
+  try:
+    with open(path) as f:
+      live = json.load(f)
+    return live if isinstance(live, dict) else None
+  except Exception:
+    return None
+
+
+def stored_items(state, today: str, live: dict | None = None) -> list:
+  """Last known odometer, the distance and the time of today, shown while the car is off. The start of the day comes from
+  the stored DailyOdometer, the last reading and the time from the RAM file of the car process when it belongs to the same
+  day. A stored day that is not today means nothing was driven yet today."""
   try:
     start = float(state["start"])
-    last = float(state.get("last", start))
     unit = str(state["unit"])
     same_day = state.get("date") in (None, today)
+    matching = isinstance(live, dict) and live.get("date") == state.get("date") and float(live.get("start", -1)) == start
+    source = live if matching else state
+    last = float(source.get("last", start))
+    seconds = max(float(source.get("seconds", 0.0)), 0.0) if same_day else 0.0
   except Exception:
     return []
   today = max(last - start, 0.0)
-  seconds = max(float(state.get("seconds", 0.0)), 0.0) if same_day else 0.0
   return [SimpleNamespace(key="odometer", label="Odometer (last known)", value=last, unit=unit, valid=True),
           SimpleNamespace(key="today", label="Today (last known)", value=today if same_day else 0.0, unit=unit, valid=True),
           SimpleNamespace(key="drive_time", label="Time (last known)", value=seconds, unit="s", valid=True)]
@@ -253,7 +269,7 @@ class MiciCarDataLayout(Scroller):
     if time.monotonic() - self._stored_time > 2.0:
       self._stored_time = time.monotonic()
       try:
-        self._stored = stored_items(ui_state.params.get("DailyOdometer"), datetime.date.today().isoformat())
+        self._stored = stored_items(ui_state.params.get("DailyOdometer"), datetime.date.today().isoformat(), read_live())
       except Exception:
         self._stored = []
     return self._stored
