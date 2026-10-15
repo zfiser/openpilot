@@ -35,7 +35,8 @@ CENTER_OFFSET_CHOICES = [(-30, "30 cm right"), (-20, "20 cm right"), (-10, "10 c
                          (20, "20 cm left"), (30, "30 cm left")]
 # RoadEdgeMinLaneWidth in metres, choices in decimetres: an automatic lane change waits until the lane next to the car is this wide.
 # On its own setting, with or without the road edge block; with it on, the road edge flag is replaced by this check.
-MIN_LANE_WIDTH_CHOICES = [(0, "off"), (20, "2.0 m"), (24, "2.4 m"), (26, "2.6 m"), (28, "2.8 m"), (30, "3.0 m"), (32, "3.2 m"), (34, "3.4 m")]
+MIN_LANE_WIDTH_CHOICES = [(0, "off"), (5, "0.5 m"), (10, "1.0 m"), (15, "1.5 m"), (20, "2.0 m"), (24, "2.4 m"), (26, "2.6 m"),
+                          (28, "2.8 m"), (30, "3.0 m"), (32, "3.2 m"), (34, "3.4 m")]
 BLINKER_SPEEDS = (0, 20, 30, 40, 50, 60, 80, 100)
 
 
