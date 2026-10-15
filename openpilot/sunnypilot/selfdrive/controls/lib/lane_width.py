@@ -33,6 +33,23 @@ def calculate_lane_width(lane_line1, lane_line2, road_edge=None) -> float:
 
 UPDATE_EVERY = 4  # frames, like StarPilot: the width is measured every 4th model frame
 DEFAULT_MIN_LANE_WIDTH = 2.8  # m, the RoadEdgeMinLaneWidth setting
+NOTICE_AFTER = 3.0  # s after the blinker before "no lane" is shown: a lane that is just opening up often comes in time
+
+
+class WaitNotice:
+  """Whether to show the "no lane" notice: only once the lane change has waited NOTICE_AFTER seconds since the blinker.
+  The wait itself is not changed, only the notice is postponed."""
+
+  def __init__(self, notice_after: float = NOTICE_AFTER):
+    self._notice_after = notice_after
+    self._waited = 0.0
+
+  def update(self, pre_lane_change: bool, waiting_for_lane: bool, dt: float) -> bool:
+    if not pre_lane_change:
+      self._waited = 0.0
+      return False
+    self._waited += dt
+    return waiting_for_lane and self._waited >= self._notice_after
 
 
 class AdjacentLaneWidth:

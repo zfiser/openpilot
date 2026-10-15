@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from openpilot.sunnypilot.selfdrive.controls.lib.lane_width import calculate_lane_width
+from openpilot.sunnypilot.selfdrive.controls.lib.lane_width import NOTICE_AFTER, WaitNotice, calculate_lane_width
 
 X = np.linspace(0, 100, 33)
 
@@ -49,3 +49,30 @@ class TestLaneWidth:
     assert calculate_lane_width(SimpleNamespace(x=[], y=[]), line(-5.4)) == 0.0
     assert calculate_lane_width(line(-1.8), SimpleNamespace(x=[1.0], y=[-5.0])) == 0.0
     assert abs(calculate_lane_width(line(-1.8), line(-5.4), SimpleNamespace(x=[], y=[])) - 3.6) < 1e-6
+
+
+DT = 0.05  # the model rate
+
+
+class TestWaitNotice:
+  def test_a_lane_opening_up_soon_gives_no_notice(self):
+    n = WaitNotice()
+    shown = [n.update(True, True, DT) for _ in range(int(2.0 / DT))]  # waits 2 s, then the lane is there
+    shown += [n.update(True, False, DT)]
+    assert not any(shown)
+
+  def test_the_notice_comes_after_the_delay(self):
+    n = WaitNotice()
+    shown = [n.update(True, True, DT) for _ in range(int(NOTICE_AFTER / DT) + 2)]
+    assert not shown[0] and shown[-1]
+
+  def test_the_delay_starts_again_with_the_next_blinker(self):
+    n = WaitNotice()
+    for _ in range(int(NOTICE_AFTER / DT) + 2):
+      n.update(True, True, DT)
+    assert not n.update(False, False, DT)  # blinker off
+    assert not n.update(True, True, DT)
+
+  def test_no_notice_when_not_waiting(self):
+    n = WaitNotice()
+    assert not any(n.update(True, False, DT) for _ in range(200))
