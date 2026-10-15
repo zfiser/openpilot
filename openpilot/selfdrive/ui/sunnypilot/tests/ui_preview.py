@@ -183,16 +183,14 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
     ui_state.update()
     hug = getattr(layout._car_onroad_layout, "_hug_screen", None)
     if hug is not None:
+      if wait == 0:  # once per shot: a write every frame would never settle
+        ui_state.params.put("LanePosition", {"hug_open": 2, "hug_indicator": -1}.get(page_name, 0), block=True)
       if page_name == "hug_open":
-        ui_state.params.put("LanePosition", 2)
         if not hug.is_open:
           hug._state.open(time.monotonic())
         hug._state.touched(time.monotonic())
-      elif page_name == "hug_indicator":
-        ui_state.params.put("LanePosition", -1)
-        hug._state.close()
       else:
-        ui_state.params.put("LanePosition", 0)
+        hug._state.close()
     if wait % 10 == 0:  # the main layout scrolls back to the road view by itself, keep asking for the page
       layout._scroll_to(page)
     wait += 1
