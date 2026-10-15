@@ -15,6 +15,35 @@ RATE = 0.12  # m/s, how fast the car moves sideways towards the target
 HOLD_SECONDS = 3.0  # keep the position for this long when the lane lines are lost, then go back to the center
 
 
+# LanePosition: the sign is the side (positive left), the size the level (1 or 2), 0 is the center
+HUG_KEYS = {(LEFT, 1): "HugLeft1Cm", (LEFT, 2): "HugLeft2Cm", (RIGHT, 1): "HugRight1Cm", (RIGHT, 2): "HugRight2Cm"}
+OLD_HUG_KEYS = {"HugLeft2Cm": "HugLeftCm", "HugRight2Cm": "HugRightCm"}  # the settings of the one level version become level 2
+
+
+def side_of(mode: int) -> int:
+  return LEFT if mode > 0 else RIGHT if mode < 0 else CENTER
+
+
+def level_of(mode: int) -> int:
+  return 0 if mode == 0 else (2 if abs(mode) >= 2 else 1)
+
+
+def wanted_shifts(mode: int, read_cm) -> tuple[float, float]:
+  """The wanted shift towards the left and the right line in metres for this mode; read_cm(key) returns a setting in cm."""
+  side = side_of(mode)
+  if side == CENTER:
+    return DEFAULT_SHIFT, DEFAULT_SHIFT
+  shift = int(read_cm(HUG_KEYS[(side, level_of(mode))])) / 100.0
+  return shift, shift
+
+
+def migrate_hug_params(params) -> None:
+  """Once: a distance set in the one level version becomes the level 2 distance (nothing happens when level 2 is set)."""
+  for new, old in OLD_HUG_KEYS.items():
+    if params.get(new) is None and params.get(old) is not None:
+      params.put(new, int(params.get(old)))
+
+
 def near_lane_line_position(y_points, count: int = 3) -> float:
   """Mean position of the first few points of a lane line, the ones closest to the car. y_points can be a capnp list, which
   does not support slicing, so the points are read by index."""

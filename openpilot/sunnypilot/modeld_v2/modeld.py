@@ -41,7 +41,7 @@ from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
 from openpilot.sunnypilot.selfdrive.controls.lib.lane_width import AdjacentLaneWidth, DEFAULT_MIN_LANE_WIDTH
-from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, DEFAULT_SHIFT, LanePosition, model_lines_to_left_positive, near_lane_line_position
+from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, DEFAULT_SHIFT, LanePosition, migrate_hug_params, side_of, wanted_shifts, model_lines_to_left_positive, near_lane_line_position
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.modeld_v2.helpers import load_oob
@@ -341,6 +341,10 @@ def main(demo=False):
   lane_position = LanePosition()  # hug the left or right lane line on request, see lane_position.py
   lane_mode = CENTER
   hug_shift = (DEFAULT_SHIFT, DEFAULT_SHIFT)  # metres towards the left and the right line
+  try:
+    migrate_hug_params(params)
+  except Exception:
+    cloudlog.exception("hug settings migration failed")
   base_camera_offset = 0.0
 
 
@@ -405,7 +409,7 @@ def main(demo=False):
     if sm.frame % 10 == 0:
       try:
         lane_mode = int(params.get("LanePosition", return_default=True))
-        hug_shift = (int(params.get("HugLeftCm", return_default=True)) / 100.0, int(params.get("HugRightCm", return_default=True)) / 100.0)
+        hug_shift = wanted_shifts(lane_mode, lambda key: params.get(key, return_default=True))
         if lane_mode != CENTER and not (sm["selfdriveState"].enabled or sm["selfdriveStateSP"].mads.active):
           params.put("LanePosition", CENTER)  # back to the center as soon as openpilot is not steering
           lane_mode = CENTER
@@ -493,7 +497,7 @@ def main(demo=False):
       try:  # an optional feature, it must never take the driving model down
         lane_lines, lane_probs = modelv2_send.modelV2.laneLines, modelv2_send.modelV2.laneLineProbs
         left_y, right_y = model_lines_to_left_positive(near_lane_line_position(lane_lines[1].y), near_lane_line_position(lane_lines[2].y))
-        lane_position.update(lane_mode, left_y, right_y, lane_probs[1], lane_probs[2], DT_MDL, *hug_shift)
+        lane_position.update(side_of(lane_mode), left_y, right_y, lane_probs[1], lane_probs[2], DT_MDL, *hug_shift)
       except Exception:
         cloudlog.exception("lane position update failed")
         lane_position.update(CENTER, 0.0, 0.0, 0.0, 0.0, DT_MDL)  # drift back to the center

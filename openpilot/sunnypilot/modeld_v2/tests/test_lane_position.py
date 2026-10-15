@@ -5,7 +5,8 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.sunnypilot.modeld_v2.lane_position import (CENTER, LEFT, RIGHT, CAR_WIDTH, SIDE_MARGIN, MAX_SHIFT, HOLD_SECONDS,
-                                                          LanePosition, model_lines_to_left_positive, near_lane_line_position, target_shift)
+                                                          LanePosition, model_lines_to_left_positive, near_lane_line_position, target_shift,
+                                                          side_of, level_of, wanted_shifts, migrate_hug_params, DEFAULT_SHIFT)
 
 DT = 0.05
 
@@ -117,3 +118,47 @@ class TestModelFrame:
 
   def test_without_the_conversion_the_lane_would_look_negative(self):
     assert target_shift(LEFT, -1.93, 1.55) == 0.0  # what the first version did: never moved
+
+
+class FakeParams:
+  def __init__(self, values):
+    self.values = dict(values)
+
+  def get(self, key, return_default=False):
+    return self.values.get(key)
+
+  def put(self, key, value):
+    self.values[key] = value
+
+
+class TestLevels:
+  def test_side_and_level(self):
+    assert [side_of(m) for m in (-2, -1, 0, 1, 2)] == [RIGHT, RIGHT, CENTER, LEFT, LEFT]
+    assert [level_of(m) for m in (-2, -1, 0, 1, 2)] == [2, 1, 0, 1, 2]
+    assert level_of(5) == 2  # anything above 2 counts as level 2
+
+  def test_each_mode_uses_its_own_distance(self):
+    cm = {"HugLeft1Cm": 30, "HugLeft2Cm": 80, "HugRight1Cm": 40, "HugRight2Cm": 60}
+    assert wanted_shifts(1, cm.get) == (0.3, 0.3)
+    assert wanted_shifts(2, cm.get) == (0.8, 0.8)
+    assert wanted_shifts(-1, cm.get) == (0.4, 0.4)
+    assert wanted_shifts(-2, cm.get) == (0.6, 0.6)
+    assert wanted_shifts(0, cm.get) == (DEFAULT_SHIFT, DEFAULT_SHIFT)
+
+  def test_a_level_2_mode_moves_further_than_level_1(self):
+    cm = {"HugLeft1Cm": 30, "HugLeft2Cm": 70}
+    lp1, lp2 = LanePosition(), LanePosition()
+    for _ in range(round(30 / DT)):
+      lp1.update(side_of(1), 1.8, -1.8, 0.9, 0.9, DT, *wanted_shifts(1, cm.get))
+      lp2.update(side_of(2), 1.8, -1.8, 0.9, 0.9, DT, *wanted_shifts(2, cm.get))
+    assert abs(lp1.offset - 0.3) < 1e-6 and abs(lp2.offset - 0.7) < 1e-6
+
+  def test_old_settings_become_level_2(self):
+    p = FakeParams({"HugLeftCm": 50, "HugRightCm": 80})
+    migrate_hug_params(p)
+    assert p.values["HugLeft2Cm"] == 50 and p.values["HugRight2Cm"] == 80
+
+  def test_migration_keeps_level_2_when_already_set(self):
+    p = FakeParams({"HugLeftCm": 50, "HugLeft2Cm": 90})
+    migrate_hug_params(p)
+    assert p.values["HugLeft2Cm"] == 90 and "HugRight2Cm" not in p.values

@@ -205,12 +205,6 @@ class TestCarData(unittest.TestCase):
     keys = ["odometer", "drive_time", "engine_temp", "rpm", "battery_12v", "today"]
     assert [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])] ==       ["today", "battery_12v", "rpm", "engine_temp", "drive_time", "odometer"]
 
-  def test_hug_buttons_select_a_side_and_press_again_to_center(self):
-    t = self.mod.toggle_lane_position
-    assert t(0, 1) == 1 and t(0, -1) == -1
-    assert t(1, 1) == 0 and t(-1, -1) == 0
-    assert t(1, -1) == -1 and t(-1, 1) == 1
-
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []

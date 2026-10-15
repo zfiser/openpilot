@@ -19,6 +19,7 @@ from openpilot.common.transformations.orientation import rot_from_euler
 if gui_app.sunnypilot_ui():
   from openpilot.selfdrive.ui.sunnypilot.mici.onroad.hud_renderer import HudRendererSP as HudRenderer
   from openpilot.selfdrive.ui.sunnypilot.mici.onroad.sidebar_widgets import MiciSidebarWidgets
+  from openpilot.selfdrive.ui.sunnypilot.mici.onroad.hug_screen import HugScreen
   from openpilot.selfdrive.ui.sunnypilot.ui_state import OnroadTimerStatus
 
 OpState = log.SelfdriveState.OpenpilotState
@@ -54,6 +55,7 @@ class AugmentedRoadView(CameraView):
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
     self._sidebar_widgets = MiciSidebarWidgets(self._confidence_ball) if gui_app.sunnypilot_ui() else None
+    self._hug_screen = HugScreen() if gui_app.sunnypilot_ui() else None  # pull down to hug a lane line
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=TextAlignment.CENTER,
@@ -61,8 +63,23 @@ class AugmentedRoadView(CameraView):
 
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
 
+  def _handle_mouse_event(self, mouse_event):
+    super()._handle_mouse_event(mouse_event)
+    if self._hug_screen is not None:
+      if self._touch_valid():
+        self._hug_screen.mouse_event(mouse_event)
+      else:
+        self._hug_screen.cancel_touch()  # the pages scroll
+
+  def _handle_mouse_release(self, mouse_pos):
+    if self._hug_screen is not None and self._hug_screen.take_release(mouse_pos.x, self.rect):
+      return  # a pull down or a hug button, not a tap that goes home
+    super()._handle_mouse_release(mouse_pos)
+
   def _update_state(self):
     super()._update_state()
+    if self._hug_screen is not None:
+      self._hug_screen.update()
 
     # update offroad label
     if ui_state.panda_type == log.PandaState.PandaType.unknown:
@@ -139,6 +156,8 @@ class AugmentedRoadView(CameraView):
       self._sidebar_widgets.render(self.rect)
       if (border := self._confidence_ball.border_color()) is not None:
         rl.draw_rectangle_lines_ex(self.rect, 1, border)
+      if self._hug_screen is not None:
+        self._hug_screen.render(self.rect)
     else:
       self._confidence_ball.render(self.rect)
 

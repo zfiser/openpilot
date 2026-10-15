@@ -172,12 +172,27 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
   for idx, scenario in enumerate(SCENARIOS.values(), 1):
     for page_name, page in (("road", layout._car_onroad_layout), ("data", layout._car_data_layout)):
       plan.append((scenario, idx, page_name, page))
+    if scenario[0].startswith("lateral only, medium"):  # steering: the hug screen open, and the indicator with it closed
+      plan.append((scenario, idx, "hug_open", layout._car_onroad_layout))
+      plan.append((scenario, idx, "hug_indicator", layout._car_onroad_layout))
 
   step, wait = 0, 0
   for _ in gui_app.render():
     scenario, idx, page_name, page = plan[step]
     send_state(pm, scenario)
     ui_state.update()
+    hug = getattr(layout._car_onroad_layout, "_hug_screen", None)
+    if hug is not None:
+      if page_name == "hug_open":
+        ui_state.params.put("LanePosition", 2)
+        if not hug.is_open:
+          hug._state.open(time.monotonic())
+        hug._state.touched(time.monotonic())
+      elif page_name == "hug_indicator":
+        ui_state.params.put("LanePosition", -1)
+        hug._state.close()
+      else:
+        ui_state.params.put("LanePosition", 0)
     if wait % 10 == 0:  # the main layout scrolls back to the road view by itself, keep asking for the page
       layout._scroll_to(page)
     wait += 1

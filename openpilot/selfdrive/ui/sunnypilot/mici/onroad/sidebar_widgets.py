@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad import display_options
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator import friction_braking
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed import gps_speed
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad.hug_logic import indicator_text
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance import CLOSING, OPENING, LeadTrend, lead_distance
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app
@@ -30,6 +31,8 @@ LEAD_GAP = 0
 BRAKE_DOT_RADIUS = 5  # a 10 px dot
 BRAKE_DOT_GAP = 9  # between the dot and the GPS speed digits
 BRAKE_DOT_COLOR = rl.Color(255, 90, 0, 255)
+HUG_COLOR = rl.Color(60, 220, 110, 255)
+HUG_FONT_SIZE = 30
 SPEED_BOTTOM_MARGIN = 10  # the text box has some padding below the digits, this lines them up with the wheel icon
 
 
@@ -43,6 +46,8 @@ class MiciSidebarWidgets(Widget):
     self._speed_font = gui_app.font(FontWeight.BOLD)
     self._lead_trend = LeadTrend()
     self._options = display_options.DisplayOptions(ui_state.params)
+    self._hug_mode = 0
+    self._hug_next_read = 0.0
     self._speed_left = 0.0  # left edge and vertical centre of the GPS speed digits, where the brake dot goes next to
     self._speed_center_y = 0.0
 
@@ -62,6 +67,8 @@ class MiciSidebarWidgets(Widget):
     self._confidence_ball.render_static(confidence_slot, max(16, min(20, int(slot_height * 0.28))))
     if self._stop_light_visible():
       self._draw_stop_light_icon(indicator_slot)
+    else:
+      self._draw_hug_indicator(indicator_slot)
     self._draw_gps_speed(rect)
     self._draw_lead_distance(rect)
     self._draw_brake_dot(rect)
@@ -98,6 +105,21 @@ class MiciSidebarWidgets(Widget):
     if not self._options.enabled(display_options.BRAKE_DOT) or not friction_braking(ui_state.sm, ui_state.started_frame):
       return
     rl.draw_circle_v(rl.Vector2(self._speed_left - BRAKE_DOT_GAP - BRAKE_DOT_RADIUS, self._speed_center_y), BRAKE_DOT_RADIUS, BRAKE_DOT_COLOR)
+
+  def _draw_hug_indicator(self, rect: rl.Rectangle) -> None:
+    """While hugging a lane line: the side and the level, for example '< 2' for level 2 to the left."""
+    if time.monotonic() >= self._hug_next_read:
+      self._hug_next_read = time.monotonic() + 0.5
+      try:
+        self._hug_mode = int(ui_state.params.get("LanePosition", return_default=True))
+      except Exception:
+        self._hug_mode = 0
+    text = indicator_text(self._hug_mode)
+    if text is None:
+      return
+    measured = measure_text_cached(self._speed_font, text, HUG_FONT_SIZE)
+    pos = rl.Vector2(rect.x + (rect.width - measured.x) / 2, rect.y + (rect.height - measured.y) / 2)
+    rl.draw_text_ex(self._speed_font, text, pos, HUG_FONT_SIZE, 0, HUG_COLOR)
 
   def _stop_light_visible(self) -> bool:
     # a stopped lead car also sets shouldStop, that is a car and not a red light, so a lead hides the icon

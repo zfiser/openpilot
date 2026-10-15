@@ -61,6 +61,8 @@ def _load_sidebar():
     "openpilot.system.ui.lib.text_measure": _stub_module("openpilot.system.ui.lib.text_measure", measure_text_cached=mock.MagicMock()),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed": _stub_module(
       "openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed", gps_speed=mock.MagicMock(return_value=None)),
+    "openpilot.selfdrive.ui.sunnypilot.mici.onroad.hug_logic": _stub_module(
+      "openpilot.selfdrive.ui.sunnypilot.mici.onroad.hug_logic", indicator_text=lambda mode: None),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.display_options": _stub_module(
       "openpilot.selfdrive.ui.sunnypilot.mici.onroad.display_options", GPS_SPEED="a", LEAD_DISTANCE="b", BRAKE_DOT="c", RPM="d",
       DisplayOptions=lambda params: types.SimpleNamespace(enabled=lambda key: True)),
