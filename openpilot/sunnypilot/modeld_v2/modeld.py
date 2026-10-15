@@ -41,7 +41,8 @@ from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
 from openpilot.sunnypilot.selfdrive.controls.lib.lane_width import AdjacentLaneWidth, DEFAULT_MIN_LANE_WIDTH, WaitNotice
-from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, DEFAULT_SHIFT, LanePosition, migrate_hug_params, side_of, wanted_shifts, model_lines_to_left_positive, near_lane_line_position
+from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, DEFAULT_SHIFT, LanePosition, migrate_hug_params, side_of, wanted_shifts, \
+  model_lines_to_left_positive, near_lane_line_position
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.modeld_v2.helpers import load_oob
