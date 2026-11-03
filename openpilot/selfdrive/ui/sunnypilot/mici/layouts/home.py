@@ -5,6 +5,7 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 import math
+import time
 
 import pyray as rl
 
@@ -51,13 +52,13 @@ class MiciHomeLayoutSP(MiciHomeLayout):
     self._quick_wifi = QuickWifiConnect(lambda: ui_state.sm['deviceState'].networkType == log.DeviceState.NetworkType.wifi)
     self._uploading = False
     self._upload_fraction = 0.0
-    self._upload_poll_time = 0.0
+    self._upload_poll_time = float("-inf")  # read at the first frame
 
   def _update_state(self):
     super()._update_state()
     self._quick_wifi.update()
     self._network_icon.set_pulsing(self._quick_wifi.connecting)
-    now = rl.get_time()
+    now = time.monotonic()
     if now - self._upload_poll_time >= UPLOAD_POLL_INTERVAL:
       self._upload_poll_time = now
       self._uploading, self._upload_fraction = read_progress()
