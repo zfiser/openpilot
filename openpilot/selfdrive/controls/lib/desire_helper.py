@@ -70,24 +70,26 @@ class DesireHelper:
                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
                           (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right))
 
+        blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
+                              (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
+
+        edge_detected = ((left_edge_detected and self.lane_change_direction == LaneChangeDirection.left) or
+                         (right_edge_detected and self.lane_change_direction == LaneChangeDirection.right))
+
         use_lane_width = min_lane_width > 0.0 and lane_width_left is not None and lane_width_right is not None
         if use_lane_width:
-          blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
-                                (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
+          # the lane width replaces the road edge flag: an automatic start waits for the lane, a nudge goes ahead
           lane_width = lane_width_left if self.lane_change_direction == LaneChangeDirection.left else lane_width_right
           self.waiting_for_lane = lane_width < min_lane_width
-        else:
-          blindspot_detected = (((carstate.leftBlindspot or left_edge_detected) and self.lane_change_direction == LaneChangeDirection.left) or
-                                ((carstate.rightBlindspot or right_edge_detected) and self.lane_change_direction == LaneChangeDirection.right))
-          self.waiting_for_lane = False
+          edge_detected = False
 
-        self.alc.update_lane_change(blindspot_detected, carstate.brakePressed)
+        self.alc.update_lane_change(blindspot_detected, edge_detected, carstate.brakePressed, torque_applied)
 
         if not one_blinker or below_lane_change_speed:
           self.lane_change_state = LaneChangeState.off
           self.lane_change_direction = LaneChangeDirection.none
           self.lane_change_timer = 0.0
-        elif (torque_applied or (self.alc.auto_lane_change_allowed and not self.waiting_for_lane)) and not blindspot_detected:
+        elif (torque_applied or (self.alc.auto_lane_change_allowed and not self.waiting_for_lane)) and not self.alc.lane_change_blocked:
           self.lane_change_state = LaneChangeState.laneChangeStarting
           self.lane_change_timer = 0.0
 

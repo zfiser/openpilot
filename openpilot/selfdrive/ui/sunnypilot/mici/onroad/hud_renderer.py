@@ -34,6 +34,7 @@ class HudRendererSP(HudRenderer):
     self._rpm_font = gui_app.font(FontWeight.BOLD)
     self._rpm_text: str | None = None
     self._options = display_options.DisplayOptions(ui_state.params)
+    self._sp_engaged: bool = False
 
   def _update_state(self) -> None:
     super()._update_state()
@@ -47,6 +48,11 @@ class HudRendererSP(HudRenderer):
       if self._rpm_filter.x <= 0:
         self._rpm_filter.x = rpm  # engine just started, take the real value instead of counting up from zero
       self._rpm_text = format_rpm(self._rpm_filter.update(rpm))
+
+    sp_engaged = ui_state.engaged
+    if sp_engaged != self._sp_engaged:
+      self._chestnut_fade_time = rl.get_time() if sp_engaged else 0
+    self._sp_engaged = sp_engaged
 
   def _render(self, rect: rl.Rectangle) -> None:
     super()._render(rect)
