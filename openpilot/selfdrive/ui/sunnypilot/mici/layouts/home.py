@@ -82,16 +82,17 @@ class MiciHomeLayoutSP(MiciHomeLayout):
     rl.draw_rectangle_rec(rl.Rectangle(self.rect.x, y, width, UPLOAD_LINE_HEIGHT), UPLOAD_LINE_COLOR)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
-    if not self._did_long_press and point_in(power_icon_rect(self.rect, self._has_alerts()), mouse_pos.x, mouse_pos.y, POWER_ICON_PAD):
+    # upstream dropped the home long press; read it only if a base class still has it
+    long_press = getattr(self, "_did_long_press", False)
+    if not long_press and point_in(power_icon_rect(self.rect, self._has_alerts()), mouse_pos.x, mouse_pos.y, POWER_ICON_PAD):
       gui_app.push_widget(PowerMenu())
       return
     icon = self._network_icon.rect
     pad = 14  # a bit larger than the 54x44 icon, but well short of the settings icon next to it
     on_network_icon = (icon.x - pad <= mouse_pos.x <= icon.x + icon.width + pad and
                        icon.y - pad <= mouse_pos.y <= icon.y + icon.height + pad)
-    if on_network_icon and not self._did_long_press:
+    if on_network_icon and not long_press:
       self._quick_wifi.tap()
-      self._did_long_press = False
       return
     super()._handle_mouse_release(mouse_pos)
 
