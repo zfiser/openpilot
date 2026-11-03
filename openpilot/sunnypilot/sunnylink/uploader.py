@@ -12,11 +12,12 @@ from collections.abc import Iterator
 from openpilot.cereal import log
 import openpilot.cereal.messaging as messaging
 from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
-from openpilot.common.utils import get_upload_stream
+from openpilot.common.utils import CallbackReader, get_upload_stream
 from openpilot.common.params import Params
 from openpilot.common.realtime import set_core_affinity
 from openpilot.common.hardware.hw import Paths
 from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
+from openpilot.system.loggerd.upload_progress import UploadProgressWriter
 from openpilot.common.swaglog import cloudlog
 
 NetworkType = log.DeviceState.NetworkType
@@ -87,6 +88,12 @@ class Uploader:
     self.immediate_folders = ["crash/", "boot/"]
     self.immediate_priority = {"qlog": 0, "qlog.zst": 0, "qcamera.ts": 1}
 
+    # progress line on the home screen: bytes done in this run of uploads and bytes still waiting
+    self.progress = UploadProgressWriter("sunnylink")
+    self.batch_done = 0
+    self.pending_bytes = 0
+    self.current_size = 0
+
   def list_upload_files(self, metered: bool) -> Iterator[tuple[str, str, str]]:
     r = self.params.get("AthenadRecentlyViewedRoutes")
     requested_routes = [] if r is None else [route for route in r.split(",") if route]
@@ -128,6 +135,7 @@ class Uploader:
 
   def next_file_to_upload(self, metered: bool) -> tuple[str, str, str] | None:
     upload_files = list(self.list_upload_files(metered))
+    self.pending_bytes = self._pending_bytes(upload_files)
 
     for name, key, fn in upload_files:
       if any(f in fn for f in self.immediate_folders):
@@ -138,6 +146,23 @@ class Uploader:
         return name, key, fn
 
     return None
+
+  def _pending_bytes(self, upload_files: list[tuple[str, str, str]]) -> int:
+    total = 0
+    for name, _, fn in upload_files:
+      if name in self.immediate_priority or any(f in fn for f in self.immediate_folders):
+        try:
+          total += os.path.getsize(fn)
+        except OSError:
+          pass
+    return total
+
+  def _on_sent(self, length: int, sent: int) -> None:
+    try:
+      part = self.current_size * sent / length if length > 0 else 0
+      self.progress.update(self.batch_done + part, self.batch_done + self.pending_bytes)
+    except Exception:
+      pass
 
   def do_upload(self, key: str, fn: str):
     url_resp = self.api.get(
@@ -160,8 +185,9 @@ class Uploader:
     stream = None
     try:
       compress = key.endswith('.zst') and not fn.endswith('.zst')
-      stream, _ = get_upload_stream(fn, compress)
-      response = requests.put(url, data=stream, headers=headers, timeout=10)
+      stream, length = get_upload_stream(fn, compress)
+      response = requests.put(url, data=CallbackReader(stream, self._on_sent, length),
+                              headers={**headers, 'Content-Length': str(length)}, timeout=10)
       return response
     finally:
       if stream:
@@ -175,6 +201,8 @@ class Uploader:
       return False
 
     cloudlog.event("upload_start", key=key, fn=fn, sz=sz, network_type=network_type, metered=metered)
+    self.current_size = sz
+    self.progress.update(self.batch_done, self.batch_done + self.pending_bytes, force=True)
 
     if sz == 0:
       # tag files of 0 size as uploaded
@@ -212,6 +240,7 @@ class Uploader:
         cloudlog.event("upload_failed", stat=stat, exc=last_exc, key=key, fn=fn, sz=sz, network_type=network_type, metered=metered)
 
     if success:
+      self.batch_done += sz
       # tag file as uploaded
       try:
         setxattr(fn, UPLOAD_ATTR_NAME, UPLOAD_ATTR_VALUE)
@@ -224,6 +253,8 @@ class Uploader:
   def step(self, network_type: int, metered: bool) -> bool | None:
     d = self.next_file_to_upload(metered)
     if d is None:
+      self.batch_done = 0
+      self.progress.idle()
       return None
 
     name, key, fn = d
@@ -262,6 +293,7 @@ def main(exit_event: threading.Event | None = None) -> None:
     offroad = params.get_bool("IsOffroad")
     network_type = sm['deviceState'].networkType if not force_wifi else NetworkType.wifi
     if network_type == NetworkType.none:
+      uploader.progress.idle()
       if allow_sleep:
         time.sleep(60 if offroad else 5)
       continue

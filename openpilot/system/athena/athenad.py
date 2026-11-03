@@ -43,6 +43,7 @@ from openpilot.common.realtime import set_core_affinity
 from openpilot.common.hardware import HARDWARE, PC
 from openpilot.system.loggerd.config import CAMERA_FPS, SEGMENT_LENGTH
 from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
+from openpilot.system.loggerd.upload_progress import UploadProgressWriter
 from openpilot.tools.lib.helpers import RE
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.version import get_build_metadata
@@ -144,6 +145,12 @@ log_recv_queue: Queue[str] = queue.Queue()
 cancelled_uploads: set[str] = set()
 
 cur_upload_items: dict[int, UploadItem | None] = {}
+
+# progress line on the home screen (see upload_progress.py), shared by the upload threads
+upload_progress = UploadProgressWriter("athena")
+upload_progress_lock = threading.Lock()
+upload_progress_state = {"done": 0, "last": 0.0}
+cur_upload_sizes: dict[int, int] = {}
 
 send_seq = itertools.count()
 def send_queue_push(data: str, priority: int) -> None:
@@ -259,6 +266,41 @@ def retry_upload(tid: int, end_event: threading.Event, increase_count: bool = Tr
         break
 
 
+def _upload_item_size(item: UploadItem) -> int:
+  for path in (item.path, strip_zst_extension(item.path)):
+    try:
+      return os.path.getsize(path)
+    except OSError:
+      continue
+  return 0
+
+
+def report_upload_progress(force: bool = False, finished_size: int = 0) -> None:
+  """Bytes sent in this run of uploads against everything sent, in flight and queued. Never raises."""
+  try:
+    now = time.monotonic()
+    with upload_progress_lock:
+      upload_progress_state["done"] += finished_size
+      if not force and now - upload_progress_state["last"] < 0.5:
+        return
+      upload_progress_state["last"] = now
+      current = current_total = 0.0
+      for tid, it in list(cur_upload_items.items()):
+        if it is not None:
+          size = cur_upload_sizes.get(tid, 0)
+          current += size * min(1.0, max(0.0, it.progress))
+          current_total += size
+      queued = sum(_upload_item_size(it) for it in list(upload_queue.queue) if it is not None and it.id not in cancelled_uploads)
+      if current_total == 0 and queued == 0:
+        upload_progress_state["done"] = 0
+        upload_progress.idle()
+        return
+      done = upload_progress_state["done"]
+      upload_progress.update(done + current, done + current_total + queued, force=True)
+  except Exception:
+    pass
+
+
 def cb(sm, item, tid, end_event: threading.Event, sz: int, cur: int) -> None:
   # Abort transfer if connection changed to metered after starting upload
   # or if athenad is shutting down to re-connect the websocket
@@ -272,6 +314,7 @@ def cb(sm, item, tid, end_event: threading.Event, sz: int, cur: int) -> None:
     raise AbortTransferException
 
   cur_upload_items[tid] = replace(item, progress=cur / sz if sz else 1)
+  report_upload_progress()
 
 
 def upload_handler(end_event: threading.Event) -> None:
@@ -280,9 +323,11 @@ def upload_handler(end_event: threading.Event) -> None:
 
   while not end_event.is_set():
     cur_upload_items[tid] = None
+    cur_upload_sizes[tid] = 0
 
     try:
       cur_upload_items[tid] = item = replace(upload_queue.get(timeout=1), current=True)
+      cur_upload_sizes[tid] = _upload_item_size(item)
 
       if item.id in cancelled_uploads:
         cancelled_uploads.remove(item.id)
@@ -317,6 +362,8 @@ def upload_handler(end_event: threading.Event) -> None:
             retry_upload(tid, end_event)
           else:
             cloudlog.event("athena.upload_handler.success", fn=fn, sz=sz, network_type=network_type, metered=metered)
+            cur_upload_items[tid] = None
+            report_upload_progress(force=True, finished_size=cur_upload_sizes.get(tid, 0))
 
         UploadQueueCache.cache(upload_queue)
       except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.SSLError):
@@ -327,7 +374,7 @@ def upload_handler(end_event: threading.Event) -> None:
         retry_upload(tid, end_event, False)
 
     except queue.Empty:
-      pass
+      report_upload_progress()
     except Exception:
       cloudlog.exception("athena.upload_handler.exception")
 

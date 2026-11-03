@@ -13,6 +13,7 @@ from openpilot.selfdrive.ui.mici.layouts.home import HOME_PADDING, MiciHomeLayou
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.power_menu import PowerMenu
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.quick_wifi import QuickWifiConnect
 from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
+from openpilot.system.loggerd.upload_progress import read_progress
 from openpilot.system.ui.lib.application import FontWeight, MousePos, gui_app
 from openpilot.system.ui.widgets.label import UnifiedLabel
 
@@ -20,6 +21,11 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 POWER_ICON_SIZE = (36, 38)
 POWER_ICON_OPACITY = 0.7
 POWER_ICON_PAD = 14  # extra touch area around the icon
+UPLOAD_LINE_HEIGHT = 4  # px, green line along the bottom edge while drives upload
+UPLOAD_LINE_MIN_WIDTH = 12  # px, so a just started upload already shows
+UPLOAD_LINE_COLOR = rl.Color(0, 200, 80, 255)
+UPLOAD_TRACK_COLOR = rl.Color(0, 200, 80, 50)
+UPLOAD_POLL_INTERVAL = 1.0  # s
 ALERTS_PILL_WIDTH = 104  # the pill takes the bottom right corner while there are alerts, the power icon moves left of it
 
 
@@ -43,11 +49,18 @@ class MiciHomeLayoutSP(MiciHomeLayout):
     self._network_icon = next(w for w in self._status_bar_layout.widgets if isinstance(w, NetworkIcon))
     self._power_icon = gui_app.texture("icons_mici/settings/device/power.png", *POWER_ICON_SIZE)
     self._quick_wifi = QuickWifiConnect(lambda: ui_state.sm['deviceState'].networkType == log.DeviceState.NetworkType.wifi)
+    self._uploading = False
+    self._upload_fraction = 0.0
+    self._upload_poll_time = 0.0
 
   def _update_state(self):
     super()._update_state()
     self._quick_wifi.update()
     self._network_icon.set_pulsing(self._quick_wifi.connecting)
+    now = rl.get_time()
+    if now - self._upload_poll_time >= UPLOAD_POLL_INTERVAL:
+      self._upload_poll_time = now
+      self._uploading, self._upload_fraction = read_progress()
 
   def _has_alerts(self) -> bool:
     return bool(self._alert_count_callback and self._alert_count_callback() > 0)
@@ -56,6 +69,16 @@ class MiciHomeLayoutSP(MiciHomeLayout):
     super()._render(rect)
     icon = power_icon_rect(self.rect, self._has_alerts())
     rl.draw_texture_ex(self._power_icon, rl.Vector2(icon.x, icon.y), 0.0, 1.0, rl.Color(255, 255, 255, int(255 * POWER_ICON_OPACITY)))
+    self._draw_upload_line()
+
+  def _draw_upload_line(self):
+    """Thin green line along the bottom while drives upload; its length is the share already sent."""
+    if not self._uploading:
+      return
+    y = self.rect.y + self.rect.height - UPLOAD_LINE_HEIGHT
+    rl.draw_rectangle_rec(rl.Rectangle(self.rect.x, y, self.rect.width, UPLOAD_LINE_HEIGHT), UPLOAD_TRACK_COLOR)
+    width = max(UPLOAD_LINE_MIN_WIDTH, self.rect.width * self._upload_fraction)
+    rl.draw_rectangle_rec(rl.Rectangle(self.rect.x, y, width, UPLOAD_LINE_HEIGHT), UPLOAD_LINE_COLOR)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if not self._did_long_press and point_in(power_icon_rect(self.rect, self._has_alerts()), mouse_pos.x, mouse_pos.y, POWER_ICON_PAD):
