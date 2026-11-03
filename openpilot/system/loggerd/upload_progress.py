@@ -1,7 +1,7 @@
 """Upload progress shared with the UI through small files in RAM (/dev/shm), one per uploading process.
 
 Each writer (uploader, sunnylink uploader, athenad) keeps its own file, so no two processes write the same one. A file holds
-{"active": bool, "done": bytes, "total": bytes, "t": wall time}. The UI adds the sources up and draws a line on the home screen.
+{"active": bool, "done": bytes, "total": bytes, "t": monotonic time (shared by all processes)}. The UI adds the sources up and draws a line on the home screen.
 Nothing here may raise: a failure only means the line is not drawn.
 """
 import json
@@ -42,7 +42,7 @@ class UploadProgressWriter:
         return  # already idle
       tmp = self.path + ".tmp"
       with open(tmp, "w") as f:
-        json.dump({"active": active, "done": state[1], "total": state[2], "t": time.time()}, f)
+        json.dump({"active": active, "done": state[1], "total": state[2], "t": time.monotonic()}, f)
       os.replace(tmp, self.path)
       self._last, self._last_write = state, now
     except Exception:
@@ -54,7 +54,7 @@ def read_progress(now: float | None = None) -> tuple[bool, float]:
   done = total = 0
   active = False
   try:
-    now = time.time() if now is None else now
+    now = time.monotonic() if now is None else now
     for name in os.listdir(PROGRESS_DIR):
       if not (name.startswith(PREFIX) and name.endswith(".json")):
         continue

@@ -32,7 +32,7 @@ def test_idle_source_ignored(tmp_path, monkeypatch):
 def test_stale_source_ignored(tmp_path, monkeypatch):
   _setup(tmp_path, monkeypatch)
   up.UploadProgressWriter("a").update(10, 100, force=True)
-  assert up.read_progress(now=time.time() + up.STALE_AFTER + 1) == (False, 0.0)
+  assert up.read_progress(now=time.monotonic() + up.STALE_AFTER + 1) == (False, 0.0)
 
 
 def test_writes_throttled(tmp_path, monkeypatch):
