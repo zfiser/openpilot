@@ -4,7 +4,7 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-from openpilot.selfdrive.ui.mici.layouts.settings.device import EngagedConfirmationCircleButton
+from openpilot.selfdrive.ui.mici.layouts.settings.device.device_layout import EngagedConfirmationCircleButton
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets.scroller import NavScroller
