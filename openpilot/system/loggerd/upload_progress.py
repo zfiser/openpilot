@@ -49,8 +49,8 @@ class UploadProgressWriter:
       pass
 
 
-def read_progress(now: float | None = None) -> tuple[bool, float]:
-  """(uploading, fraction 0..1) over all sources. Never raises."""
+def read_totals(now: float | None = None) -> tuple[bool, int, int]:
+  """(uploading, bytes done, bytes in total) over all sources. Never raises."""
   done = total = 0
   active = False
   try:
@@ -69,7 +69,62 @@ def read_progress(now: float | None = None) -> tuple[bool, float]:
       except Exception:
         continue
   except Exception:
-    return False, 0.0
+    return False, 0, 0
+  return active, (done if active else 0), (total if active else 0)
+
+
+def read_progress(now: float | None = None) -> tuple[bool, float]:
+  """(uploading, fraction 0..1) over all sources. Never raises."""
+  active, done, total = read_totals(now)
   if not active:
     return False, 0.0
   return True, (min(1.0, done / total) if total > 0 else 0.0)
+
+
+class UploadRate:
+  """Upload speed over the last WINDOW seconds and the time left at that speed. Feed it read_totals() about once a second."""
+  WINDOW = 10.0  # s
+  MIN_SPAN = 2.0  # s of samples before a speed is shown
+
+  def __init__(self):
+    self._samples: list[tuple[float, int]] = []
+
+  def update(self, now: float, active: bool, done: int, total: int) -> tuple[float | None, float | None]:
+    """(bytes per second or None while unknown, seconds left or None)."""
+    if not active:
+      self._samples.clear()
+      return None, None
+    if self._samples and done < self._samples[-1][1]:
+      self._samples.clear()  # a new run of uploads started from zero
+    self._samples.append((now, done))
+    while len(self._samples) > 2 and now - self._samples[0][0] > self.WINDOW:
+      self._samples.pop(0)
+    t0, d0 = self._samples[0]
+    if now - t0 < self.MIN_SPAN:
+      return None, None
+    speed = (done - d0) / (now - t0)
+    if speed <= 0:
+      return 0.0, None
+    return speed, max(0, total - done) / speed
+
+
+def format_bytes(n: float) -> str:
+  if n >= 1e9:
+    return f"{n / 1e9:.1f} GB"
+  if n >= 1e6:
+    return f"{n / 1e6:.0f} MB" if n >= 1e8 else f"{n / 1e6:.1f} MB"
+  return f"{n / 1e3:.0f} kB"
+
+
+def format_speed(bps: float) -> str:
+  return format_bytes(bps) + "/s"
+
+
+def format_duration(seconds: float) -> str:
+  s = int(round(seconds))
+  if s < 60:
+    return f"{s} s"
+  m = (s + 30) // 60
+  if m < 60:
+    return f"{m} min"
+  return f"{m // 60} h {m % 60} min"

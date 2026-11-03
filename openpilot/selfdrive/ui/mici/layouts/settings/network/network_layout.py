@@ -8,6 +8,8 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.cellular_manager import CellularManager
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network, MeteredType
 from openpilot.system.ui.widgets.scroller import NavScroller
+if gui_app.sunnypilot_ui():
+  from openpilot.selfdrive.ui.sunnypilot.mici.layouts.upload_status import UploadStatusButton
 
 
 class NetworkLayoutMici(NavScroller):
@@ -90,6 +92,8 @@ class NetworkLayoutMici(NavScroller):
     self._cellular_metered_btn = BigParamControl("cellular metered", "GsmMetered", description="Prevent large uploads over the cellular connection.")
 
     # Main scroller ----------------------------------
+    if gui_app.sunnypilot_ui():
+      self._scroller.add_widget(UploadStatusButton())  # share sent, speed and time left of the drive uploads
     self._scroller.add_widgets([
       self._wifi_button,
       self._esim_button,
