@@ -111,7 +111,7 @@ def press(current_mode: int, auto_on: bool, column: int) -> tuple[int, bool]:
 
 # the arrow on the driving screen while the car hugs a line: tall and narrow, at the edge of the camera picture on that side
 ARROW_WIDTH = 34.0
-ARROW_HEIGHT = 170.0
+ARROW_HEIGHT = 136.0  # starts below the engine rpm in the top left corner (centred in the 240 px screen: top at 52 px)
 ARROW_MARGIN = 16.0  # px from the edge of the camera picture
 ARROW_TOUCH_WIDTH = 140.0  # px from the edge, the arrow is easy to hit while driving
 ARROW_TOUCH_HEIGHT = 280.0

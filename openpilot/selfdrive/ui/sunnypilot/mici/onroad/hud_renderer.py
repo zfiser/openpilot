@@ -20,6 +20,7 @@ RPM_UNIT_FONT_SIZE = 22
 RPM_UNIT_GAP = 6  # between the number and the unit
 RPM_SMOOTHING_TAU = 0.25  # seconds, an exponential average, higher is smoother but slower to follow
 RPM_TOP_OFFSET = 12  # distance of the text from the top edge of the road view
+RPM_LEFT_OFFSET = 16  # distance of the number from the left edge of the road view (the hug arrow uses the same margin)
 RPM_COLOR = rl.Color(255, 255, 255, 255)  # white with a black outline, readable in sunlight
 RPM_OUTLINE_COLOR = rl.Color(0, 0, 0, 255)
 RPM_OUTLINE = 2  # px
@@ -60,14 +61,14 @@ class HudRendererSP(HudRenderer):
     self._draw_rpm(rect)
 
   def _draw_rpm(self, rect: rl.Rectangle) -> None:
-    """Engine RPM, top centre. Not drawn while the engine is off or the car does not report it, nor while an alert is on
+    """Engine RPM, top left. Not drawn while the engine is off or the car does not report it, nor while an alert is on
     screen (changing lane, pay attention and so on), as the alert uses the same place."""
     if self._rpm_text is None or not self._can_draw_top_icons:
       return
-    # only the number is centred, the unit hangs off its right side and its bottom lines up with the number
+    # the number starts at the left margin, the unit follows on its right and its bottom lines up with the number
     size = measure_text_cached(self._rpm_font, self._rpm_text, RPM_FONT_SIZE)
     unit_size = measure_text_cached(self._rpm_font, "rpm", RPM_UNIT_FONT_SIZE)
-    pos = rl.Vector2(rect.x + rect.width / 2 - size.x / 2, rect.y + RPM_TOP_OFFSET)
+    pos = rl.Vector2(rect.x + RPM_LEFT_OFFSET, rect.y + RPM_TOP_OFFSET)
     unit_pos = rl.Vector2(pos.x + size.x + RPM_UNIT_GAP, pos.y + size.y - unit_size.y - 2)
     for text, text_pos, font_size in ((self._rpm_text, pos, RPM_FONT_SIZE), ("rpm", unit_pos, RPM_UNIT_FONT_SIZE)):
       for dx, dy in RPM_OUTLINE_OFFSETS:
