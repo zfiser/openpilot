@@ -47,6 +47,7 @@ from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelp
 from openpilot.sunnypilot.selfdrive.controls.lib.lane_width import AdjacentLaneWidth, DEFAULT_MIN_LANE_WIDTH, WaitNotice
 from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, DEFAULT_SHIFT, LanePosition, migrate_hug_params, side_of, wanted_shifts, \
   model_lines_to_left_positive, near_lane_line_position
+from openpilot.sunnypilot.modeld_v2.auto_hug import AutoHug, edge_distances
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.modeld_v2.helpers import load_model
@@ -362,6 +363,11 @@ def main(demo=False):
   lane_position = LanePosition()  # hug the left or right lane line on request, see lane_position.py
   lane_mode = CENTER
   hug_shift = (DEFAULT_SHIFT, DEFAULT_SHIFT)  # metres towards the left and the right line
+  auto_hug = AutoHug()  # the AutoHug setting: picks the side from the lane the car is in, see auto_hug.py
+  auto_hug_on = False
+  auto_hug_shift = (DEFAULT_SHIFT, DEFAULT_SHIFT)  # level 1 distances towards the left and the right line
+  steering_now = False
+  hug_side = CENTER
   try:
     migrate_hug_params(params)
   except Exception:
@@ -440,6 +446,17 @@ def main(demo=False):
           lane_mode = CENTER
       except Exception:
         lane_mode = CENTER
+      try:  # automatic hug, an optional feature: a failure leaves it off
+        steering_now = bool(sm["selfdriveState"].enabled or sm["selfdriveStateSP"].mads.active)
+        auto_hug_on = params.get_bool("AutoHug")
+        auto_hug_shift = (int(params.get("HugLeft1Cm", return_default=True)) / 100.0, int(params.get("HugRight1Cm", return_default=True)) / 100.0)
+        if params.get_bool("AutoHugPause"):
+          params.put_bool("AutoHugPause", False)  # one write per tap of the arrow
+          auto_hug.pause()
+        if not (auto_hug_on and steering_now):
+          auto_hug.reset()
+      except Exception:
+        auto_hug_on = False
     camera_offset_helper.set_offset(base_camera_offset + lane_position.offset)
     lat_delay = model.lat_delay + model.LAT_SMOOTH_SECONDS
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
@@ -525,10 +542,19 @@ def main(demo=False):
 
       try:  # an optional feature, it must never take the driving model down
         lane_lines, lane_probs = modelv2_send.modelV2.laneLines, modelv2_send.modelV2.laneLineProbs
-        left_y, right_y = model_lines_to_left_positive(near_lane_line_position(lane_lines[1].y), near_lane_line_position(lane_lines[2].y))
-        lane_position.update(side_of(lane_mode), left_y, right_y, lane_probs[1], lane_probs[2], DT_MDL, *hug_shift)
+        left_line, right_line = near_lane_line_position(lane_lines[1].y), near_lane_line_position(lane_lines[2].y)
+        left_y, right_y = model_lines_to_left_positive(left_line, right_line)
+        hug_side, shifts = side_of(lane_mode), hug_shift  # a manual hug always wins
+        if lane_mode == CENTER and auto_hug_on and steering_now:
+          road_edges = modelv2_send.modelV2.roadEdges
+          left_edge_d, right_edge_d = edge_distances(left_line, right_line, near_lane_line_position(road_edges[0].y),
+                                                     near_lane_line_position(road_edges[1].y))
+          hug_side = auto_hug.update(left_edge_d, right_edge_d, v_ego, DH.lane_change_state != log.LaneChangeState.off, DT_MDL)
+          shifts = auto_hug_shift
+        lane_position.update(hug_side, left_y, right_y, lane_probs[1], lane_probs[2], DT_MDL, *shifts)
       except Exception:
         cloudlog.exception("lane position update failed")
+        hug_side = CENTER
         lane_position.update(CENTER, 0.0, 0.0, 0.0, 0.0, DT_MDL)  # drift back to the center
 
       desire_state = modelv2_send.modelV2.meta.desireState
@@ -566,6 +592,12 @@ def main(demo=False):
       mdv2sp_send.modelDataV2SP.blendfulLeftProb = blendful.l_prob
       mdv2sp_send.modelDataV2SP.blendfulRightProb = blendful.r_prob
       mdv2sp_send.modelDataV2SP.blendfulLaneWidth = float(blendful.lane_width.x)
+      try:
+        mdv2sp_send.modelDataV2SP.hugSide = int(hug_side)
+        mdv2sp_send.modelDataV2SP.hugAuto = bool(auto_hug_on)
+        mdv2sp_send.modelDataV2SP.hugOffset = float(lane_position.offset)
+      except Exception:
+        pass  # only for the UI arrows and the logs
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
       drivingdata_send.drivingModelData.meta.laneChangeDirection = DH.lane_change_direction
 

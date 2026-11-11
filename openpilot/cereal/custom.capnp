@@ -486,6 +486,9 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   blendfulLeftProb @7 :Float32;
   blendfulRightProb @8 :Float32;
   blendfulLaneWidth @9 :Float32;
+  hugSide @10 :Int8;  # the side the car hugs now: 1 left, -1 right, 0 centered (manual or automatic)
+  hugAuto @11 :Bool;  # the AutoHug setting is on
+  hugOffset @12 :Float32;  # m added to the camera offset by the hug, positive moves the car left
 
   enum TurnDirection {
     none @0;

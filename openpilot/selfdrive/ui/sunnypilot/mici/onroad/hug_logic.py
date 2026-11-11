@@ -4,9 +4,10 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 
-The logic of the pull down hug screen, without any drawing: which mode a button press gives, when a drag is a pull down and
-when the screen closes by itself. The modes are the LanePosition setting read by the model process (see
-sunnypilot/modeld_v2/lane_position.py): the sign is the side (positive left), the size the level 1 or 2, 0 the center.
+The logic of the pull down hug screen and of the hug arrows on the driving screen, without any drawing: which mode a button
+press gives, when a drag is a pull down, when the screen closes by itself and where the arrows are. The modes are the
+LanePosition setting read by the model process (see sunnypilot/modeld_v2/lane_position.py): the sign is the side (positive
+left), the size the level 1 or 2, 0 the center. AutoHug is the automatic hug (sunnypilot/modeld_v2/auto_hug.py).
 """
 LEFT, CENTER, RIGHT = 1, 0, -1
 PULL_DOWN_MIN = 40.0  # px down before a drag opens (or closes) the screen
@@ -100,9 +101,51 @@ class HugScreenState:
       self.is_open = False
 
 
-def indicator_text(mode: int) -> str | None:
-  """The small marker on the driving screen, None while centered."""
-  if mode == 0:
-    return None
-  level = 2 if abs(mode) >= 2 else 1
-  return f"< {level}" if mode > 0 else f"{level} >"
+def press(current_mode: int, auto_on: bool, column: int) -> tuple[int, bool]:
+  """A button of the pull down screen -> (LanePosition, AutoHug). Left / right: a manual hug, which turns the automatic one
+  off so the two never fight. Middle: the automatic hug on or off, both from the center."""
+  if column == CENTER:
+    return 0, not auto_on
+  return next_mode(current_mode, column), False
+
+
+# the arrow on the driving screen while the car hugs a line: tall and narrow, at the edge of the camera picture on that side
+ARROW_WIDTH = 34.0
+ARROW_HEIGHT = 170.0
+ARROW_MARGIN = 16.0  # px from the edge of the camera picture
+ARROW_TOUCH_WIDTH = 140.0  # px from the edge, the arrow is easy to hit while driving
+ARROW_TOUCH_HEIGHT = 280.0
+
+
+def arrow_box(side: int, x: float, y: float, width: float, height: float) -> tuple[float, float, float, float]:
+  """(left, top, width, height) of the arrow of this side in the camera picture rectangle (x, y, width, height)."""
+  top = y + (height - ARROW_HEIGHT) / 2
+  left = x + ARROW_MARGIN if side == LEFT else x + width - ARROW_MARGIN - ARROW_WIDTH
+  return left, top, ARROW_WIDTH, ARROW_HEIGHT
+
+
+def arrow_points(side: int, x: float, y: float, width: float, height: float) -> tuple[tuple[float, float], ...]:
+  """The three points of the chevron, the tip on the outside: '<' on the left, '>' on the right."""
+  left, top, w, h = arrow_box(side, x, y, width, height)
+  tip_x, back_x = (left, left + w) if side == LEFT else (left + w, left)
+  return (back_x, top), (tip_x, top + h / 2), (back_x, top + h)
+
+
+def arrow_hit(side: int, px: float, py: float, x: float, y: float, width: float, height: float) -> bool:
+  if side == CENTER:
+    return False
+  if abs(py - (y + height / 2)) > ARROW_TOUCH_HEIGHT / 2:
+    return False
+  return x <= px <= x + ARROW_TOUCH_WIDTH if side == LEFT else x + width - ARROW_TOUCH_WIDTH <= px <= x + width
+
+
+CANCEL_MANUAL, PAUSE_AUTO = "cancel_manual", "pause_auto"
+
+
+def arrow_tap(manual_mode: int, auto_on: bool) -> str | None:
+  """What a tap on the arrow does: a manual hug ends (centered), an automatic one pauses until the next lane change."""
+  if manual_mode != 0:
+    return CANCEL_MANUAL
+  if auto_on:
+    return PAUSE_AUTO
+  return None

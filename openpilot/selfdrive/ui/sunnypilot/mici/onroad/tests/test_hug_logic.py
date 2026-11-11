@@ -89,10 +89,36 @@ class TestScreenState(unittest.TestCase):
     s.toggle(1.0)
     assert not s.is_open
 
-  def test_indicator(self):
-    assert h.indicator_text(0) is None
-    assert h.indicator_text(1) == "< 1" and h.indicator_text(2) == "< 2"
-    assert h.indicator_text(-1) == "1 >" and h.indicator_text(-2) == "2 >"
+  def test_side_buttons_turn_auto_off(self):
+    assert h.press(0, True, h.LEFT) == (1, False)
+    assert h.press(1, False, h.LEFT) == (2, False)
+    assert h.press(2, True, h.RIGHT) == (-1, False)
+
+  def test_middle_button_toggles_auto_from_the_center(self):
+    assert h.press(0, False, h.CENTER) == (0, True)
+    assert h.press(0, True, h.CENTER) == (0, False)
+    assert h.press(-2, False, h.CENTER) == (0, True)  # a manual hug ends when auto goes on
+
+  def test_arrow_shape_and_place(self):
+    x, y, w, hgt = 0.0, 0.0, 400.0, 240.0
+    (bx1, by1), (tx, ty), (bx2, by2) = h.arrow_points(h.LEFT, x, y, w, hgt)
+    assert tx < bx1 == bx2 and ty == hgt / 2  # '<', tip on the outside
+    assert by2 - by1 == h.ARROW_HEIGHT and by2 - by1 > 3 * h.ARROW_WIDTH  # tall and narrow
+    (rb, _), (rt, _), _ = h.arrow_points(h.RIGHT, x, y, w, hgt)
+    assert rt > rb and rt == w - h.ARROW_MARGIN  # '>' at the right edge
+
+  def test_arrow_hit(self):
+    box = (0.0, 0.0, 400.0, 240.0)
+    assert h.arrow_hit(h.LEFT, 30, 120, *box)
+    assert not h.arrow_hit(h.LEFT, 370, 120, *box)
+    assert h.arrow_hit(h.RIGHT, 370, 120, *box)
+    assert not h.arrow_hit(h.CENTER, 30, 120, *box)
+
+  def test_arrow_tap(self):
+    assert h.arrow_tap(1, False) == h.CANCEL_MANUAL
+    assert h.arrow_tap(-2, True) == h.CANCEL_MANUAL
+    assert h.arrow_tap(0, True) == h.PAUSE_AUTO
+    assert h.arrow_tap(0, False) is None
 
 
 if __name__ == "__main__":

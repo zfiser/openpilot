@@ -76,8 +76,8 @@ class AugmentedRoadView(CameraView):
         self._hug_screen.cancel_touch()  # the pages scroll
 
   def _handle_mouse_release(self, mouse_pos):
-    if self._hug_screen is not None and self._hug_screen.take_release(mouse_pos.x, self.rect):
-      return  # a pull down or a hug button, not a tap that goes home
+    if self._hug_screen is not None and self._hug_screen.take_release(mouse_pos, self.rect, self._content_rect):
+      return  # a pull down, a hug button or the hug arrow, not a tap that goes home
     super()._handle_mouse_release(mouse_pos)
 
   def _update_state(self):
@@ -169,7 +169,7 @@ class AugmentedRoadView(CameraView):
       if (border := self._confidence_ball.border_color()) is not None:
         rl.draw_rectangle_lines_ex(self.rect, 1, border)
       if self._hug_screen is not None:
-        self._hug_screen.render(self.rect)
+        self._hug_screen.render(self.rect, self._content_rect)
 
 
   def close(self):

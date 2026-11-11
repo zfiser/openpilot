@@ -172,19 +172,26 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
   for idx, scenario in enumerate(SCENARIOS.values(), 1):
     for page_name, page in (("road", layout._car_onroad_layout), ("data", layout._car_data_layout)):
       plan.append((scenario, idx, page_name, page))
-    if scenario[0].startswith("lateral only, medium"):  # steering: the hug screen open, and the indicator with it closed
+    if scenario[0].startswith("lateral only, medium"):  # steering: the hug screen open, and the arrows with it closed
       plan.append((scenario, idx, "hug_open", layout._car_onroad_layout))
-      plan.append((scenario, idx, "hug_indicator", layout._car_onroad_layout))
+      plan.append((scenario, idx, "hug_arrow_left", layout._car_onroad_layout))
+      plan.append((scenario, idx, "hug_arrow_right", layout._car_onroad_layout))
+  hug_sides = {"hug_arrow_left": 1, "hug_arrow_right": -1}
 
   step, wait = 0, 0
   for _ in gui_app.render():
     scenario, idx, page_name, page = plan[step]
     send_state(pm, scenario)
+    hug_msg = messaging.new_message('modelDataV2SP')
+    hug_msg.modelDataV2SP.hugSide = hug_sides.get(page_name, 0)
+    hug_msg.modelDataV2SP.hugAuto = page_name == "hug_arrow_right"
+    pm.send('modelDataV2SP', hug_msg)
     ui_state.update()
     hug = getattr(layout._car_onroad_layout, "_hug_screen", None)
     if hug is not None:
       if wait == 0:  # once per shot: a write every frame would never settle
-        ui_state.params.put("LanePosition", {"hug_open": 2, "hug_indicator": -1}.get(page_name, 0), block=True)
+        ui_state.params.put("LanePosition", {"hug_arrow_left": 1}.get(page_name, 0), block=True)
+        ui_state.params.put_bool("AutoHug", page_name in ("hug_open", "hug_arrow_right"), block=True)
       if page_name == "hug_open":
         if not hug.is_open:
           hug._state.open(time.monotonic())
@@ -235,7 +242,8 @@ def main() -> None:
     device.set_override_interactive_timeout(99999)
 
     pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2",
-                   "driverMonitoringState", "driverStateV2", "peripheralState", "selfdriveStateSP", "gpsLocationExternal"])
+                   "driverMonitoringState", "driverStateV2", "peripheralState", "selfdriveStateSP", "gpsLocationExternal",
+                   "modelDataV2SP"])
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)
