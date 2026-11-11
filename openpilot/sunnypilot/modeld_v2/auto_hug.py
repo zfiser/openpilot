@@ -16,7 +16,7 @@ from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, LEFT, RIGHT
 
 LANE_ON = 4.5  # m from the own lane line to the road edge: from here on there is a lane on that side
 LANE_OFF = 4.0  # m, below this there is none any more (in between the last answer stays)
-HOLD_SECONDS = 5.0  # the lane answer must stay the same this long before the hug side changes
+HOLD_SECONDS = 2.0  # the lane answer must stay the same this long before the hug side changes (after a lane change too)
 DISAGREE_SECONDS = 1.0  # back to the center while the lane seen now has differed from the held one this long (a lane change
                         # without openpilot, or the lanes are changing), until the new answer is held
 MIN_SPEED = 22.0  # m/s (80 km/h), the highway: starts hugging from here on
