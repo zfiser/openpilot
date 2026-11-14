@@ -29,6 +29,8 @@ TIMEOUT_CHOICES = [(0, "default"), (30, "30 s"), (60, "1 m"), (90, "90 s"), (120
 ONROAD_BRIGHTNESS_CHOICES = [(0, "auto"), (1, "auto dark"), (2, "screen off"), (4, "10 %"), (6, "20 %"), (8, "30 %"),
                              (12, "50 %"), (22, "100 %")]
 SCREEN_SAVER_CHOICES = [(60, "1 m"), (120, "2 m"), (180, "3 m"), (300, "5 m"), (600, "10 m")]
+# AutoHugMinSpeed in km/h: the automatic hug starts from this speed (and stops 10 km/h below it)
+AUTO_HUG_SPEED_CHOICES = [(speed, f"{speed} km/h") for speed in range(50, 101, 10)]
 HUG_CM_CHOICES = [(20, "20 cm"), (30, "30 cm"), (40, "40 cm"), (50, "50 cm"), (60, "60 cm"), (70, "70 cm"), (80, "80 cm"), (90, "90 cm")]
 # CameraOffset in metres, positive moves the car to the left: a permanent shift of the center, in steps of 10 cm
 CENTER_OFFSET_CHOICES = [(-30, "30 cm right"), (-20, "20 cm right"), (-10, "10 cm right"), (0, "none"), (10, "10 cm left"),
@@ -67,6 +69,7 @@ def hug_panel() -> SettingsPanel:
     BigChoiceParam("hug right\nlevel 1", "HugRight1Cm", HUG_CM_CHOICES),
     BigChoiceParam("hug right\nlevel 2", "HugRight2Cm", HUG_CM_CHOICES),
     BigChoiceParam("center\nposition", "CameraOffset", CENTER_OFFSET_CHOICES, scale=0.01),
+    BigChoiceParam("auto hug\nfrom", "AutoHugMinSpeed", AUTO_HUG_SPEED_CHOICES),
   ])
 
 

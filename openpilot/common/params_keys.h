@@ -48,6 +48,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"RoadEdgeMinLaneWidth", {PERSISTENT | BACKUP, FLOAT, "2.8"}},  // m, the narrowest lane an automatic lane change waits for
     {"LanePosition", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, INT, "0"}},  // sign = side (+ left), size = level 1 or 2, 0 center
     {"AutoHug", {PERSISTENT | BACKUP, BOOL, "0"}},  // hug the left line in the left-most lane, the right line in the right-most lane (highway)
+    {"AutoHugMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},  // km/h, auto hug starts from this speed and stops 10 km/h below it
     {"AutoHugPause", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL, "0"}},  // set by the UI arrow tap, modeld pauses until a lane change and clears it
     {"DisengageOnAccelerator", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"DongleId", {PERSISTENT, STRING}},

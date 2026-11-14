@@ -4,7 +4,7 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 
-Automatic hug (the AutoHug setting): from 50 km/h, hug the left lane line in the left-most lane, the right lane line in the
+Automatic hug (the AutoHug setting): from the AutoHugMinSpeed speed (default 50 km/h), hug the left lane line in the left-most lane, the right lane line in the
 right-most lane and stay centered in any lane in between.
 
 Which lane: the distance from the car's own lane line to the road edge on that side. Next to the left-most lane the left road
@@ -19,8 +19,20 @@ LANE_OFF = 4.0  # m, below this there is none any more (in between the last answ
 HOLD_SECONDS = 2.0  # the lane answer must stay the same this long before the hug side changes (after a lane change too)
 DISAGREE_SECONDS = 1.0  # back to the center while the lane seen now has differed from the held one this long (a lane change
                         # without openpilot, or the lanes are changing), until the new answer is held
-MIN_SPEED = 13.9  # m/s (50 km/h): starts hugging from here on (was 80 km/h until 2026-11-14)
-STOP_SPEED = 11.1  # m/s (40 km/h), stops hugging below this
+DEFAULT_MIN_KPH = 50  # the AutoHugMinSpeed setting (km/h, 50-100 in steps of 10): starts hugging from here on
+STOP_BELOW_KPH = 10  # and stops this much below it (50 -> 40 km/h), so it does not switch on and off at the threshold
+KPH_TO_MS = 1 / 3.6
+
+
+def speeds_for(min_kph) -> tuple[float, float]:
+  """(start, stop) speed in m/s for the AutoHugMinSpeed setting; anything unreadable or out of range gives the default."""
+  try:
+    kph = int(min_kph)
+  except (TypeError, ValueError):
+    kph = DEFAULT_MIN_KPH
+  if not 30 <= kph <= 150:
+    kph = DEFAULT_MIN_KPH
+  return kph * KPH_TO_MS, (kph - STOP_BELOW_KPH) * KPH_TO_MS
 
 LEFTMOST, MIDDLE, RIGHTMOST, UNKNOWN = "leftmost", "middle", "rightmost", "unknown"
 SIDE_OF_LANE = {LEFTMOST: LEFT, RIGHTMOST: RIGHT}
@@ -57,6 +69,14 @@ class AutoHug:
   becomes a different one, or a lane change of openpilot finishes), then the automatic hug carries on."""
 
   def __init__(self):
+    self.min_speed, self.stop_speed = speeds_for(DEFAULT_MIN_KPH)
+    self._clear()
+
+  def set_min_speed(self, min_kph) -> None:
+    """The AutoHugMinSpeed setting in km/h."""
+    self.min_speed, self.stop_speed = speeds_for(min_kph)
+
+  def _clear(self) -> None:
     self._left = SideLane()
     self._right = SideLane()
     self.lane = UNKNOWN  # the held answer
@@ -76,14 +96,14 @@ class AutoHug:
 
   def reset(self) -> None:
     """Off, or openpilot is not steering: start from scratch next time (a pause ends too)."""
-    self.__init__()
+    self._clear()  # the speed setting stays
 
   def update(self, left_edge_distance: float, right_edge_distance: float, v_ego: float, lane_changing: bool, dt: float) -> int:
     """left/right_edge_distance: metres from the own lane line to the road edge on that side (positive).
     lane_changing: openpilot is changing lanes (from the blinker until it is done)."""
-    if v_ego >= MIN_SPEED:
+    if v_ego >= self.min_speed:
       self._fast = True
-    elif v_ego < STOP_SPEED:
+    elif v_ego < self.stop_speed:
       self._fast = False
 
     finished_change = self._was_changing and not lane_changing

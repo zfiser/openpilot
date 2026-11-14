@@ -5,7 +5,7 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.sunnypilot.modeld_v2.auto_hug import (AutoHug, HOLD_SECONDS, LEFTMOST, MIDDLE, RIGHTMOST, UNKNOWN, edge_distances,
-                                                     lane_of)
+                                                     lane_of, speeds_for)
 from openpilot.sunnypilot.modeld_v2.lane_position import CENTER, LEFT, RIGHT
 
 DT = 0.05
@@ -59,6 +59,22 @@ class TestAutoHug:
     assert run(ah, LEFT_LANE, 1, v=FAST) == LEFT
     assert run(ah, LEFT_LANE, 1, v=12.0) == LEFT  # 43 km/h, above the stop speed
     assert run(ah, LEFT_LANE, 1, v=10.5) == CENTER  # 38 km/h
+
+  def test_speed_setting(self):
+    ah = AutoHug()
+    ah.set_min_speed(80)
+    assert run(ah, LEFT_LANE, 10, v=20.0) == CENTER  # 72 km/h, below 80
+    assert run(ah, LEFT_LANE, 1, v=23.0) == LEFT  # 83 km/h
+    assert run(ah, LEFT_LANE, 1, v=19.8) == LEFT  # 71 km/h, above the stop speed of 70
+    assert run(ah, LEFT_LANE, 1, v=19.0) == CENTER  # 68 km/h
+    ah.reset()
+    assert abs(ah.min_speed - 80 / 3.6) < 1e-9  # a reset keeps the setting
+
+  def test_speed_setting_falls_back_to_the_default(self):
+    for bad in (None, "x", 5, 400):
+      assert speeds_for(bad) == speeds_for(50)
+    start, stop = speeds_for(50)
+    assert abs(start * 3.6 - 50) < 1e-9 and abs(stop * 3.6 - 40) < 1e-9
 
   def test_centered_while_openpilot_changes_lanes_and_found_again_after(self):
     ah = AutoHug()

@@ -449,6 +449,7 @@ def main(demo=False):
       try:  # automatic hug, an optional feature: a failure leaves it off
         steering_now = bool(sm["selfdriveState"].enabled or sm["selfdriveStateSP"].mads.active)
         auto_hug_on = params.get_bool("AutoHug")
+        auto_hug.set_min_speed(params.get("AutoHugMinSpeed", return_default=True))
         auto_hug_shift = (int(params.get("HugLeft1Cm", return_default=True)) / 100.0, int(params.get("HugRight1Cm", return_default=True)) / 100.0)
         if params.get_bool("AutoHugPause"):
           params.put_bool("AutoHugPause", False)  # one write per tap of the arrow

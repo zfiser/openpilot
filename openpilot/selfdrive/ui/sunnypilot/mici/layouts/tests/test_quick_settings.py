@@ -49,7 +49,7 @@ class TestQuickSettings(unittest.TestCase):
 
   def test_choice_lists_have_unique_values_and_labels(self):
     for name in ("LANE_CHANGE_CHOICES", "LANE_CHANGE_SMOOTHING_CHOICES", "STEERING_ON_BRAKE_CHOICES", "BLINKER_DELAY_CHOICES", "OFF_ON_CHOICES",
-                 "TIMEOUT_CHOICES", "HUG_CM_CHOICES", "CENTER_OFFSET_CHOICES", "MIN_LANE_WIDTH_CHOICES", "ONROAD_BRIGHTNESS_CHOICES", "SCREEN_SAVER_CHOICES"):
+                 "TIMEOUT_CHOICES", "HUG_CM_CHOICES", "AUTO_HUG_SPEED_CHOICES", "CENTER_OFFSET_CHOICES", "MIN_LANE_WIDTH_CHOICES", "ONROAD_BRIGHTNESS_CHOICES", "SCREEN_SAVER_CHOICES"):
       choices = getattr(self.m, name)
       assert len({v for v, _ in choices}) == len(choices), name
       assert len({label for _, label in choices}) == len(choices), name
