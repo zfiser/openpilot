@@ -53,12 +53,12 @@ class TestAutoHug:
     run(ah, LEFT_LANE, 10)
     assert run(ah, (1.5, 4.2), 10) == LEFT  # between 4.0 and 4.5 m: still a lane on the right
 
-  def test_only_at_highway_speed(self):
+  def test_only_from_50_kmh(self):
     ah = AutoHug()
-    assert run(ah, LEFT_LANE, 10, v=15.0) == CENTER
+    assert run(ah, LEFT_LANE, 10, v=12.0) == CENTER  # 43 km/h, never started
     assert run(ah, LEFT_LANE, 1, v=FAST) == LEFT
-    assert run(ah, LEFT_LANE, 1, v=20.0) == LEFT  # 72 km/h, above the stop speed
-    assert run(ah, LEFT_LANE, 1, v=18.0) == CENTER
+    assert run(ah, LEFT_LANE, 1, v=12.0) == LEFT  # 43 km/h, above the stop speed
+    assert run(ah, LEFT_LANE, 1, v=10.5) == CENTER  # 38 km/h
 
   def test_centered_while_openpilot_changes_lanes_and_found_again_after(self):
     ah = AutoHug()

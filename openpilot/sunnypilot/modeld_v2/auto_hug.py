@@ -4,7 +4,7 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 
-Automatic hug (the AutoHug setting): on the highway, hug the left lane line in the left-most lane, the right lane line in the
+Automatic hug (the AutoHug setting): from 50 km/h, hug the left lane line in the left-most lane, the right lane line in the
 right-most lane and stay centered in any lane in between.
 
 Which lane: the distance from the car's own lane line to the road edge on that side. Next to the left-most lane the left road
@@ -19,8 +19,8 @@ LANE_OFF = 4.0  # m, below this there is none any more (in between the last answ
 HOLD_SECONDS = 2.0  # the lane answer must stay the same this long before the hug side changes (after a lane change too)
 DISAGREE_SECONDS = 1.0  # back to the center while the lane seen now has differed from the held one this long (a lane change
                         # without openpilot, or the lanes are changing), until the new answer is held
-MIN_SPEED = 22.0  # m/s (80 km/h), the highway: starts hugging from here on
-STOP_SPEED = 19.0  # m/s (68 km/h), stops hugging below this
+MIN_SPEED = 13.9  # m/s (50 km/h): starts hugging from here on (was 80 km/h until 2026-11-14)
+STOP_SPEED = 11.1  # m/s (40 km/h), stops hugging below this
 
 LEFTMOST, MIDDLE, RIGHTMOST, UNKNOWN = "leftmost", "middle", "rightmost", "unknown"
 SIDE_OF_LANE = {LEFTMOST: LEFT, RIGHTMOST: RIGHT}
