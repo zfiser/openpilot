@@ -34,7 +34,7 @@ from openpilot.sunnypilot.selfdrive.selfdrived.button_state_tracker import Butto
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.selfdrived.fun_odometer import FUN, FAR, NEAR, odometer_from
 from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import ClosingWarning, COLLISION as CLOSING_COLLISION, \
-  DISTRACTED as CLOSING_DISTRACTED
+  DISTRACTED as CLOSING_DISTRACTED, radar_distance
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -101,7 +101,7 @@ class SelfdriveD:
     self.car_state_sock = messaging.sub_sock('carState', timeout=20)
 
     ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan'] + ['modelDataV2SP', 'longitudinalPlanSP'] + \
-             ['carStateSP']  # fork: only for the fun odometer chime, must never count as a comm issue
+             ['carStateSP']  # fork: for the fun odometer chime and the closing warning, must never count as a comm issue
     if SIMULATION:
       ignore += ['cabinCameraState', 'managerState']
     if REPLAY:
@@ -296,12 +296,15 @@ class SelfdriveD:
         pass
 
       try:  # fork: closing warning, optional, must never disturb the alerts
-        if self.closing_warning_on:
-          lead = self.sm['radarState'].leadOne
-          vision = self.sm['driverMonitoringState'].visionPolicyState
-          kind = self.closing_warning.update(CS.vEgo, bool(lead.present), lead.dRel, lead.vRel, CS.cruiseState.enabled, CS.gasPressed,
-                                             CS.brakePressed, CS.leftBlinker or CS.rightBlinker, CS.steeringAngleDeg,
-                                             bool(vision.isDistracted), DT_CTRL)
+        # the car's radar (carData, the number on the driving screen), only while carStateSP is fresh
+        fresh = self.sm.frame - self.sm.recv_frame['carStateSP'] < int(0.5 / DT_CTRL)
+        if self.closing_warning_on and fresh:
+          distance = radar_distance(self.sm['carStateSP'].carData)
+          vision = self.sm['radarState'].leadOne  # the camera lead on this car (no radar tracks with stock ACC)
+          distracted = self.sm.alive['driverMonitoringState'] and bool(self.sm['driverMonitoringState'].visionPolicyState.isDistracted)
+          kind = self.closing_warning.update(CS.vEgo, distance, CS.cruiseState.enabled, CS.gasPressed, CS.brakePressed,
+                                             CS.leftBlinker or CS.rightBlinker, CS.steeringAngleDeg, distracted, DT_CTRL,
+                                             vision.dRel if vision.present else None, vision.vRel)
           if kind == CLOSING_COLLISION:
             self.events_sp.add(custom.OnroadEventSP.EventName.closingCollision)
           elif kind == CLOSING_DISTRACTED:
