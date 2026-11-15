@@ -362,6 +362,8 @@ struct OnroadEventSP @0xda96579883444c35 {
     bigModelReady @25;
     funOdometerFar @26;  # fork: the odometer reaches a "fun" number in 1 km (fun_odometer.py)
     funOdometerNear @27;  # fork: and in 100 m
+    closingCollision @28;  # fork: closing in fast on the car ahead (closing_warning.py)
+    closingDistracted @29;  # fork: closing in while the driver camera reports not looking
   }
 }
 

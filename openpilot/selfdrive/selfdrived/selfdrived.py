@@ -33,6 +33,8 @@ from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.con
 from openpilot.sunnypilot.selfdrive.selfdrived.button_state_tracker import ButtonStateTracker
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.selfdrived.fun_odometer import FUN, FAR, NEAR, odometer_from
+from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import ClosingWarning, COLLISION as CLOSING_COLLISION, \
+  DISTRACTED as CLOSING_DISTRACTED
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -118,6 +120,8 @@ class SelfdriveD:
     self.is_metric = self.params.get_bool("IsMetric")
     self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
     self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
+    self.closing_warning = ClosingWarning()  # fork: chime when closing in on the car ahead, see closing_warning.py
+    self.closing_warning_on = True
 
     car_recognized = self.CP.brand != 'mock'
 
@@ -288,6 +292,20 @@ class SelfdriveD:
             self.events_sp.add(custom.OnroadEventSP.EventName.funOdometerFar)
           elif notice == NEAR:
             self.events_sp.add(custom.OnroadEventSP.EventName.funOdometerNear)
+      except Exception:
+        pass
+
+      try:  # fork: closing warning, optional, must never disturb the alerts
+        if self.closing_warning_on:
+          lead = self.sm['radarState'].leadOne
+          vision = self.sm['driverMonitoringState'].visionPolicyState
+          kind = self.closing_warning.update(CS.vEgo, bool(lead.present), lead.dRel, lead.vRel, CS.cruiseState.enabled, CS.gasPressed,
+                                             CS.brakePressed, CS.leftBlinker or CS.rightBlinker, CS.steeringAngleDeg,
+                                             bool(vision.isDistracted), DT_CTRL)
+          if kind == CLOSING_COLLISION:
+            self.events_sp.add(custom.OnroadEventSP.EventName.closingCollision)
+          elif kind == CLOSING_DISTRACTED:
+            self.events_sp.add(custom.OnroadEventSP.EventName.closingDistracted)
       except Exception:
         pass
 
@@ -674,6 +692,10 @@ class SelfdriveD:
       self.personality = self.params.get("LongitudinalPersonality", return_default=True)
 
       self.mads.read_params()
+      try:
+        self.closing_warning_on = self.params.get_bool("ClosingWarning")
+      except Exception:
+        self.closing_warning_on = False  # a key the device does not know yet (before the reboot after an update)
       time.sleep(0.1)
 
   def run(self):

@@ -276,4 +276,21 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventNameSP.funOdometerNear: {
     ET.PERMANENT: _fun_odometer_alert(NEAR),
   },
+
+  # closing in on the car ahead while the driver controls the speed (closing_warning.py)
+  EventNameSP.closingCollision: {
+    ET.PERMANENT: Alert(
+      "CAR AHEAD",
+      "BRAKE",
+      AlertStatus.critical, AlertSize.mid,
+      Priority.HIGH, VisualAlert.none, AudibleAlert.warningSoft, 2.),
+  },
+
+  EventNameSP.closingDistracted: {
+    ET.PERMANENT: Alert(
+      "Watch the car ahead",
+      "",
+      AlertStatus.userPrompt, AlertSize.small,
+      Priority.MID, VisualAlert.none, AudibleAlert.prompt, 3.),
+  },
 }

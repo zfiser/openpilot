@@ -124,6 +124,7 @@ def driving_screen_panel() -> SettingsPanel:
     BigBoolParam("lead\ndistance", "ShowLeadDistance"),
     BigBoolParam("brake dot", "ShowBrakeDot"),
     BigBoolParam("engine rpm", "ShowRpm"),
+    BigBoolParam("closing\nwarning", "ClosingWarning"),
     reset_btn,
   ])
 
