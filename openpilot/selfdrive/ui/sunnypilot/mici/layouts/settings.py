@@ -54,7 +54,7 @@ class SettingsLayoutSP(OP.SettingsLayout):
     models_btn = SettingsBigButton(tr("models"), "", gui_app.texture("../../sunnypilot/selfdrive/assets/offroad/icon_models.png", ICON_SIZE, ICON_SIZE))
     models_btn.set_click_callback(lambda: gui_app.push_widget(models_panel))
 
-    # enable button always sits at the end of the list (right of developer), onroad or offroad
+    # enable button always sits at the end of the list, onroad or offroad
     self._enable_offroad_btn = BigCircleButton(self.icon_offroad_enable, red=True)
     self._enable_offroad_btn.set_click_callback(lambda: self._handle_always_offroad(True))
     self._enable_offroad_btn.set_visible(lambda: not ui_state.always_offroad)
@@ -63,7 +63,8 @@ class SettingsLayoutSP(OP.SettingsLayout):
     self._disable_offroad_btn.set_click_callback(lambda: self._handle_always_offroad(False))
     self._disable_offroad_btn.set_visible(lambda: ui_state.always_offroad)
 
-    items = self._scroller._items.copy()
+    # developer lives in the toggles menu (4th item, quick_settings.py), not here
+    items = [item for item in self._scroller._items if getattr(item, "text", None) != "developer"]
 
     items.insert(1, models_btn)
     items.insert(5, sunnylink_btn)

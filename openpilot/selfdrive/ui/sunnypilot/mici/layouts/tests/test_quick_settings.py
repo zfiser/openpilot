@@ -28,6 +28,7 @@ def _stub(name: str, **attrs) -> types.ModuleType:
 def _load():
   stubs = {
     "openpilot.selfdrive.ui.mici.layouts.settings.toggles": _stub("t", TogglesLayoutMici=_Base),
+    "openpilot.selfdrive.ui.mici.layouts.settings.developer": _stub("dev", DeveloperLayoutMici=_Base),
     "openpilot.selfdrive.ui.mici.widgets.button": _stub("b", BigButton=_Base),
     "openpilot.selfdrive.ui.mici.widgets.dialog": _stub("d", BigConfirmationDialog=_Base),
     "openpilot.selfdrive.ui.sunnypilot.mici.widgets.param_buttons": _stub("p", BigBoolParam=_Base, BigChoiceParam=_Base),
@@ -49,7 +50,8 @@ class TestQuickSettings(unittest.TestCase):
 
   def test_choice_lists_have_unique_values_and_labels(self):
     for name in ("LANE_CHANGE_CHOICES", "LANE_CHANGE_SMOOTHING_CHOICES", "STEERING_ON_BRAKE_CHOICES", "BLINKER_DELAY_CHOICES", "OFF_ON_CHOICES",
-                 "TIMEOUT_CHOICES", "HUG_CM_CHOICES", "AUTO_HUG_SPEED_CHOICES", "CENTER_OFFSET_CHOICES", "MIN_LANE_WIDTH_CHOICES", "ONROAD_BRIGHTNESS_CHOICES", "SCREEN_SAVER_CHOICES"):
+                 "TIMEOUT_CHOICES", "HUG_CM_CHOICES", "AUTO_HUG_SPEED_CHOICES", "CENTER_OFFSET_CHOICES", "MIN_LANE_WIDTH_CHOICES",
+                 "ONROAD_BRIGHTNESS_CHOICES", "SCREEN_SAVER_CHOICES"):
       choices = getattr(self.m, name)
       assert len({v for v, _ in choices}) == len(choices), name
       assert len({label for _, label in choices}) == len(choices), name

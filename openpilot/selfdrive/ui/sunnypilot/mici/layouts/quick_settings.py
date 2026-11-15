@@ -6,6 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 from collections.abc import Callable
 
+from openpilot.selfdrive.ui.mici.layouts.settings.developer import DeveloperLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.toggles import TogglesLayoutMici
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationDialog
@@ -17,6 +18,7 @@ from openpilot.system.ui.widgets.scroller import NavScroller
 
 ICON = "icons_mici/settings.png"
 LKAS_ICON = "icons_mici/settings/device/lkas.png"
+DEVELOPER_ICON = "icons_mici/settings/developer_icon.png"
 
 LANE_CHANGE_CHOICES = [(-1, "off"), (0, "nudge"), (1, "nudgeless"), (2, "0.5 s"), (3, "1 s"), (4, "2 s"), (5, "3 s")]
 # LaneChangeSmoothing: how slowly the steering may change during a lane change, 1 is the smoothest, 10 leaves the stock limit
@@ -147,18 +149,19 @@ class TogglesMenu(NavScroller):
 
   def __init__(self):
     super().__init__()
-    entries: list[tuple[str, str, Callable[[], NavScroller]]] = [
-      ("hug", LKAS_ICON, hug_panel),
-      ("steering", LKAS_ICON, steering_panel),
-      ("lane change", ICON, lane_change_panel),
-      ("blinker", ICON, blinker_panel),
-      ("screen", ICON, screen_panel),
-      ("driving\nscreen", ICON, driving_screen_panel),
-      ("other\ntoggles", ICON, TogglesLayoutMici),
+    entries: list[tuple[str, str, tuple[int, int], Callable[[], NavScroller]]] = [
+      ("hug", LKAS_ICON, (64, 64), hug_panel),
+      ("steering", LKAS_ICON, (64, 64), steering_panel),
+      ("lane change", ICON, (64, 64), lane_change_panel),
+      ("developer", DEVELOPER_ICON, (64, 60), DeveloperLayoutMici),  # moved here from the main settings menu
+      ("blinker", ICON, (64, 64), blinker_panel),
+      ("screen", ICON, (64, 64), screen_panel),
+      ("driving\nscreen", ICON, (64, 64), driving_screen_panel),
+      ("other\ntoggles", ICON, (64, 64), TogglesLayoutMici),
     ]
     buttons = []
-    for title, icon, make_panel in entries:
-      button = BigButton(title, "", gui_app.texture(icon, 64, 64))
+    for title, icon, (width, height), make_panel in entries:
+      button = BigButton(title, "", gui_app.texture(icon, width, height))
       button.set_click_callback(lazy(make_panel))
       buttons.append(button)
     self._scroller.add_widgets(buttons)
