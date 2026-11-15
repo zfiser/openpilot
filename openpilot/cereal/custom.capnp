@@ -360,6 +360,8 @@ struct OnroadEventSP @0xda96579883444c35 {
     e2eChime @23;
     laneChangeRoadEdge @24;
     bigModelReady @25;
+    funOdometerFar @26;  # fork: the odometer reaches a "fun" number in 1 km (fun_odometer.py)
+    funOdometerNear @27;  # fork: and in 100 m
   }
 }
 

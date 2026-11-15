@@ -12,6 +12,7 @@ from openpilot.sunnypilot.selfdrive.selfdrived.events_base import EventsBase, Pr
   NoEntryAlert, ImmediateDisableAlert, EngagementAlert, AlertCallbackType, wrong_car_mode_alert
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import PCM_LONG_REQUIRED_MAX_SET_SPEED, CONFIRM_SPEED_THRESHOLD
 from openpilot.common.hardware import HARDWARE
+from openpilot.sunnypilot.selfdrive.selfdrived.fun_odometer import FUN, FAR, NEAR, notice_text
 
 AlertSize = log.SelfdriveState.AlertSize
 AlertStatus = log.SelfdriveState.AlertStatus
@@ -36,6 +37,17 @@ def speed_limit_adjust_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.
     "",
     AlertStatus.normal, AlertSize.small,
     Priority.LOW, VisualAlert.none, AudibleAlert.none, 4.)
+
+
+def _fun_odometer_alert(kind: str) -> AlertCallbackType:
+  """The chime before a "fun" odometer number, the text names the number (fun_odometer.py)."""
+  def alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
+    try:
+      text = notice_text(FUN.target, FUN.unit, kind)
+    except Exception:
+      text = "fun odometer number ahead"
+    return Alert(text, "", AlertStatus.normal, AlertSize.small, Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 5.)
+  return alert
 
 
 def speed_limit_pre_active_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
@@ -255,5 +267,13 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 2.),
+  },
+
+  EventNameSP.funOdometerFar: {
+    ET.PERMANENT: _fun_odometer_alert(FAR),
+  },
+
+  EventNameSP.funOdometerNear: {
+    ET.PERMANENT: _fun_odometer_alert(NEAR),
   },
 }
