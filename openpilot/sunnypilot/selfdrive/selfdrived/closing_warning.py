@@ -15,10 +15,16 @@ jump to a nearer car counts as a cut-in. While not looking, the soft chime comes
 
 - COLLISION, whatever the driver camera says: the gap would be gone in under COLLISION_TTC at the current closing speed.
 - DISTRACTED, only while the driver camera reports the driver not looking: the gap would be gone in under DISTRACTED_TTC, or
-  the car follows closer than DISTRACTED_GAP while still closing, or a car cuts in closer than CUT_IN_GAP.
+  the car follows closer than DISTRACTED_GAP while still closing.
+- DISTRACTED also when the road ahead was clear and now is not, at any distance the radar sees (up to about 130 m): a car
+  cuts in, or the radar finds a slower car we are catching up on, while the driver looks away (a mirror, the screen). A
+  glance is short, so a look away within APPEAR_WINDOW before or after the car appeared is enough, and a glance counts from
+  a smaller head turn (looking_away) than the driver camera's own "distracted". The same car coming back after a short
+  radar dropout (about the same distance) does not count.
 
 Never while braking, with a blinker on (overtaking), with the wheel turned (junctions) or below MIN_SPEED.
 """
+import math
 from collections import deque
 
 COLLISION, DISTRACTED = "collision", "distracted"
@@ -28,8 +34,13 @@ MIN_CLOSING = 1.5  # m/s (5.4 km/h), slower closing never warns (the slope of wh
 COLLISION_TTC = 2.0  # s
 DISTRACTED_TTC = 3.0  # s
 DISTRACTED_GAP = 0.5  # s of following distance
-CUT_IN_GAP = 1.0  # s, a lead that appears closer than this
-CUT_IN_ABSENT = 1.0  # s without a lead before, so a short radar dropout of the same car is no cut-in
+APPEAR_ABSENT = 1.0  # s without a lead before: the road was clear
+APPEAR_WINDOW = 1.0  # s, a look away this long before or after the car appeared counts (a glance is short)
+SAME_CAR_TIME = 10.0  # s, a lead lost this recently that comes back at about the same distance is the same car
+SAME_CAR_TOL = 0.15  # share of the distance (at least SAME_CAR_MIN m)
+SAME_CAR_MIN = 8.0  # m
+LOOK_YAW = 15.0  # deg of head turn from straight ahead that counts as a glance away (the camera's "distracted": about 23)
+LOOK_PITCH = 12.0  # deg of head tilt down (the screen, the console)
 MAX_WHEEL = 30.0  # deg, more is a turn
 PERSIST = 0.3  # s, the condition must hold this long (a single radar glitch does not chime)
 COOLDOWN = 15.0  # s between two chimes of the same kind
@@ -78,37 +89,61 @@ class ClosingWarning:
     self._held = {COLLISION: 0.0, DISTRACTED: 0.0}
     self._last = {COLLISION: -1e9, DISTRACTED: -1e9}
     self._absent = 0.0  # s without a lead
+    self._appear_t = -1e9  # time the lead that is still there appeared (the road was clear before)
+    self._look_t = -1e9  # time the driver last looked away
+    self._lost_t = -1e9  # time and distance the last lead was lost
+    self._lost_d = 0.0
     self._rate = LeadRate()
 
   def update(self, v_ego: float, distance: float | None, acc_on: bool, gas: bool, brake: bool, blinker: bool, wheel_deg: float,
-             distracted: bool, dt: float, vision_d: float | None = None, vision_v_rel: float = 0.0) -> str | None:
+             distracted: bool, dt: float, vision_d: float | None = None, vision_v_rel: float = 0.0,
+             looking_away: bool | None = None) -> str | None:
     """COLLISION or DISTRACTED in the one frame a chime is due, otherwise None. distance: radar metres, None without a lead.
-    vision_d / vision_v_rel: openpilot's (camera) lead, its smoother relative speed is used when it is the same car."""
+    vision_d / vision_v_rel: openpilot's (camera) lead, its smoother relative speed is used when it is the same car.
+    looking_away: a glance away (see looking_away()), for a car that appears; None = distracted."""
     self._t += dt
+    if distracted if looking_away is None else looking_away:
+      self._look_t = self._t
     previous = self._rate.last
     rate = self._rate.update(self._t, distance)
-    # a car that appears after a while without one, or the radar switching to a nearer car, is a cut-in
-    cut_in = distance is not None and (self._absent >= CUT_IN_ABSENT or (self._rate.jumped and previous is not None and distance < previous))
+    # a car after a while without one (not the same car back from a short dropout), or the radar switching to a nearer car
+    appeared = False
+    if distance is not None:
+      if self._absent >= APPEAR_ABSENT:
+        same_car = (self._t - self._lost_t <= SAME_CAR_TIME and
+                    abs(distance - self._lost_d) <= max(SAME_CAR_MIN, SAME_CAR_TOL * self._lost_d))
+        appeared = not same_car
+      elif self._rate.jumped and previous is not None and distance < previous:
+        appeared = True
+    elif previous is not None:
+      self._lost_t, self._lost_d = self._t, previous
     self._absent = 0.0 if distance is not None else self._absent + dt
+    if distance is None:
+      self._appear_t = -1e9
+    elif appeared:
+      self._appear_t = self._t
     if distance is not None and vision_d is not None and abs(vision_d - distance) <= max(5.0, VISION_MATCH * distance):
       rate = vision_v_rel  # the same car: the camera's relative speed is smoother than the slope of whole metres
 
     driver_controls_speed = (not acc_on) or gas
     if not (driver_controls_speed and distance is not None and v_ego >= MIN_SPEED) or brake or blinker or abs(wheel_deg) > MAX_WHEEL:
       self._held = dict.fromkeys(self._held, 0.0)
+      self._appear_t = -1e9  # a car seen while braking, changing lanes or on ACC never chimes later
       return None
 
     gap = distance / max(v_ego, 1.0)
     closing = -rate if rate is not None else 0.0
     ttc = distance / closing if closing >= MIN_CLOSING else float("inf")
-    cut_in_close = cut_in and gap < CUT_IN_GAP
+    # the road was clear, a car appeared a moment ago and is still there, and the driver looked away around that moment
+    appeared_unseen = self._t - self._appear_t <= APPEAR_WINDOW and self._t - self._look_t <= APPEAR_WINDOW
     want = {
       COLLISION: ttc < COLLISION_TTC,
       DISTRACTED: distracted and (ttc < DISTRACTED_TTC or (closing >= MIN_CLOSING and gap < DISTRACTED_GAP)),
     }
-    if cut_in_close and distracted and not want[COLLISION] and self._t - self._last[DISTRACTED] >= COOLDOWN:
+    if appeared_unseen and not want[COLLISION] and self._t - self._last[DISTRACTED] >= COOLDOWN:
       self._last[DISTRACTED] = self._t
-      return DISTRACTED  # a cut-in is one moment, no persistence
+      self._appear_t = -1e9
+      return DISTRACTED  # one moment, no persistence
     for kind in (COLLISION, DISTRACTED):
       held = self._held[kind] + dt if want[kind] else 0.0
       self._held[kind] = held
@@ -118,6 +153,19 @@ class ClosingWarning:
           self._last[DISTRACTED] = self._t  # the stronger warning covers the softer one
         return kind
     return None
+
+
+def looking_away(vision_policy_state) -> bool:
+  """A glance away from the road from driverMonitoringState.visionPolicyState: the camera's own "distracted", or the head
+  turned more than LOOK_YAW to a side or tilted more than LOOK_PITCH down (from the learned straight-ahead pose)."""
+  p = vision_policy_state
+  if p.isDistracted:
+    return True
+  if not p.faceDetected:
+    return False
+  yaw = math.degrees(p.pose.yaw - p.pose.yawCalib.offset)
+  pitch = math.degrees(p.pose.pitch - p.pose.pitchCalib.offset)
+  return abs(yaw) > LOOK_YAW or pitch < -LOOK_PITCH
 
 
 def radar_distance(car_data) -> float | None:

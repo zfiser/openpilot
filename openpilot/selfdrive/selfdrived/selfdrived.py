@@ -34,7 +34,7 @@ from openpilot.sunnypilot.selfdrive.selfdrived.button_state_tracker import Butto
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.selfdrived.fun_odometer import FUN, FAR, NEAR, odometer_from
 from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import ClosingWarning, COLLISION as CLOSING_COLLISION, \
-  DISTRACTED as CLOSING_DISTRACTED, radar_distance
+  DISTRACTED as CLOSING_DISTRACTED, radar_distance, looking_away as closing_looking_away
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -301,10 +301,13 @@ class SelfdriveD:
         if self.closing_warning_on and fresh:
           distance = radar_distance(self.sm['carStateSP'].carData)
           vision = self.sm['radarState'].leadOne  # the camera lead on this car (no radar tracks with stock ACC)
-          distracted = self.sm.alive['driverMonitoringState'] and bool(self.sm['driverMonitoringState'].visionPolicyState.isDistracted)
+          dm_alive = self.sm.alive['driverMonitoringState']
+          vps = self.sm['driverMonitoringState'].visionPolicyState
+          distracted = dm_alive and bool(vps.isDistracted)
+          glance = dm_alive and closing_looking_away(vps)  # a smaller head turn, for a car that appears
           kind = self.closing_warning.update(CS.vEgo, distance, CS.cruiseState.enabled, CS.gasPressed, CS.brakePressed,
                                              CS.leftBlinker or CS.rightBlinker, CS.steeringAngleDeg, distracted, DT_CTRL,
-                                             vision.dRel if vision.present else None, vision.vRel)
+                                             vision.dRel if vision.present else None, vision.vRel, glance)
           if kind == CLOSING_COLLISION:
             self.events_sp.add(custom.OnroadEventSP.EventName.closingCollision)
           elif kind == CLOSING_DISTRACTED:
