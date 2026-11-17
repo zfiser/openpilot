@@ -4,14 +4,14 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 
-Closing warning (the ClosingWarning setting): a chime when the car closes in on the car ahead while the driver controls the
-speed: ACC off, or ACC on with the gas pressed.
+Closing warning (the ClosingWarning setting): a chime when the car closes in on the car ahead, or when a car appears ahead
+while the driver looks away, while the driver controls the speed: ACC off, or ACC on with the gas pressed.
 
 The distance is the car's own radar, the number on the driving screen (carData "lead_distance", DSU_CRUISE on the RAV4: whole
 metres at 5 Hz, no relative speed). openpilot's radarState lead is vision only on this car (stock ACC, no radar tracks): its
 relative speed is used when its distance matches the radar (the same car), otherwise the slope of a straight line through
 the radar distances of the last second. A jump of more than 4 m is the radar switching cars: the line starts over, and a
-jump to a nearer car counts as a cut-in. While not looking, the soft chime comes first and the strong one follows (escalation).
+jump to a nearer car counts as a car that appeared (a cut-in). While not looking, the soft chime comes first and the strong one follows (escalation).
 
 - COLLISION, whatever the driver camera says: the gap would be gone in under COLLISION_TTC at the current closing speed.
 - DISTRACTED, only while the driver camera reports the driver not looking: the gap would be gone in under DISTRACTED_TTC, or
