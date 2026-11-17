@@ -16,8 +16,9 @@ jump to a nearer car counts as a cut-in. While not looking, the soft chime comes
 - COLLISION, whatever the driver camera says: the gap would be gone in under COLLISION_TTC at the current closing speed.
 - DISTRACTED, only while the driver camera reports the driver not looking: the gap would be gone in under DISTRACTED_TTC, or
   the car follows closer than DISTRACTED_GAP while still closing.
-- DISTRACTED also when the road ahead was clear and now is not, at any distance the radar sees (up to about 130 m): a car
-  cuts in, or the radar finds a slower car we are catching up on, while the driver looks away (a mirror, the screen). A
+- DISTRACTED also (setting ClosingWarningAppear, appear_on) when the road ahead was clear and now is not, at any distance
+  the radar sees (up to about 130 m): a car cuts in, or the radar finds a slower car we are catching up on, while the
+  driver looks away (a mirror, the screen). A
   glance is short, so a look away within APPEAR_WINDOW before or after the car appeared is enough, and a glance counts from
   a smaller head turn (looking_away) than the driver camera's own "distracted". The same car coming back after a short
   radar dropout (about the same distance) does not count.
@@ -94,6 +95,7 @@ class ClosingWarning:
     self._lost_t = -1e9  # time and distance the last lead was lost
     self._lost_d = 0.0
     self._rate = LeadRate()
+    self.appear_on = True  # the ClosingWarningAppear setting: the chime for a car that appears while looking away
 
   def update(self, v_ego: float, distance: float | None, acc_on: bool, gas: bool, brake: bool, blinker: bool, wheel_deg: float,
              distracted: bool, dt: float, vision_d: float | None = None, vision_v_rel: float = 0.0,
@@ -135,7 +137,7 @@ class ClosingWarning:
     closing = -rate if rate is not None else 0.0
     ttc = distance / closing if closing >= MIN_CLOSING else float("inf")
     # the road was clear, a car appeared a moment ago and is still there, and the driver looked away around that moment
-    appeared_unseen = self._t - self._appear_t <= APPEAR_WINDOW and self._t - self._look_t <= APPEAR_WINDOW
+    appeared_unseen = self.appear_on and self._t - self._appear_t <= APPEAR_WINDOW and self._t - self._look_t <= APPEAR_WINDOW
     want = {
       COLLISION: ttc < COLLISION_TTC,
       DISTRACTED: distracted and (ttc < DISTRACTED_TTC or (closing >= MIN_CLOSING and gap < DISTRACTED_GAP)),

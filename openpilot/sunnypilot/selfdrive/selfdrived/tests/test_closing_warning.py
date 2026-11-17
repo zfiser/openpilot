@@ -134,6 +134,15 @@ class TestClosingWarning:
     cw = ClosingWarning()
     assert run(cw, 3.0, d=15.0, closing=2.0, look=True) == []
 
+  def test_appear_setting_off(self):
+    cw = ClosingWarning()
+    cw.appear_on = False
+    run(cw, 1.5, present=False)
+    assert run(cw, 0.8, d=60.0, closing=0.0, look=True) == []  # no chime for the new car
+    cw = ClosingWarning()
+    cw.appear_on = False
+    assert run(cw, 1.0, d=40.0, closing=12.0, distracted=True) == [DISTRACTED]  # closing in while not looking still warns
+
   def test_one_chime_per_appearance(self):
     cw = ClosingWarning()
     run(cw, 1.5, present=False)

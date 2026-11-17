@@ -702,6 +702,10 @@ class SelfdriveD:
         self.closing_warning_on = self.params.get_bool("ClosingWarning")
       except Exception:
         self.closing_warning_on = False  # a key the device does not know yet (before the reboot after an update)
+      try:
+        self.closing_warning.appear_on = self.params.get_bool("ClosingWarningAppear")
+      except Exception:
+        self.closing_warning.appear_on = True  # unknown key before the reboot: keep the chime as before
       time.sleep(0.1)
 
   def run(self):

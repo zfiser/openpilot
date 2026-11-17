@@ -127,6 +127,7 @@ def driving_screen_panel() -> SettingsPanel:
     BigBoolParam("brake dot", "ShowBrakeDot"),
     BigBoolParam("engine rpm", "ShowRpm"),
     BigBoolParam("closing\nwarning", "ClosingWarning"),
+    BigBoolParam("new car\nahead", "ClosingWarningAppear"),  # the closing warning's chime for a car that appears ahead
     reset_btn,
   ])
 
