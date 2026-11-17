@@ -99,10 +99,11 @@ class ClosingWarning:
 
   def update(self, v_ego: float, distance: float | None, acc_on: bool, gas: bool, brake: bool, blinker: bool, wheel_deg: float,
              distracted: bool, dt: float, vision_d: float | None = None, vision_v_rel: float = 0.0,
-             looking_away: bool | None = None) -> str | None:
+             looking_away: bool | None = None, radar_v_rel: float | None = None) -> str | None:
     """COLLISION, DISTRACTED or APPEARED in the one frame a chime is due, otherwise None. distance: radar metres, None without a lead.
     vision_d / vision_v_rel: openpilot's (camera) lead, its smoother relative speed is used when it is the same car.
-    looking_away: a glance away (see looking_away()), for a car that appears; None = distracted."""
+    looking_away: a glance away (see looking_away()), for a car that appears; None = distracted.
+    radar_v_rel: the radar's own relative speed of that lead (radar_lead()), used before the camera's and the slope."""
     self._t += dt
     if distracted if looking_away is None else looking_away:
       self._look_t = self._t
@@ -126,6 +127,8 @@ class ClosingWarning:
       self._appear_t = self._t
     if distance is not None and vision_d is not None and abs(vision_d - distance) <= max(5.0, VISION_MATCH * distance):
       rate = vision_v_rel  # the same car: the camera's relative speed is smoother than the slope of whole metres
+    if distance is not None and radar_v_rel is not None:
+      rate = radar_v_rel  # measured by the radar itself for exactly this lead
 
     driver_controls_speed = (not acc_on) or gas
     if not (driver_controls_speed and distance is not None and v_ego >= MIN_SPEED) or brake or blinker or abs(wheel_deg) > MAX_WHEEL:
@@ -168,6 +171,22 @@ def looking_away(vision_policy_state) -> bool:
   yaw = math.degrees(p.pose.yaw - p.pose.yawCalib.offset)
   pitch = math.degrees(p.pose.pitch - p.pose.pitchCalib.offset)
   return abs(yaw) > LOOK_YAW or pitch < -LOOK_PITCH
+
+
+def radar_lead(car_data) -> tuple[float | None, float | None] | None:
+  """The radar's raw lead from the car data items: (distance m, relative speed m/s, positive = the gap opens), each None when
+  not valid (no lead). None when the car sends no radar data (other cars, or the radar messages stopped): use radar_distance."""
+  distance = speed = None
+  seen = False
+  for item in car_data:
+    if item.key == "radar_distance":
+      seen = True
+      distance = float(item.value) if item.valid else None
+    elif item.key == "radar_rel_speed":
+      speed = float(item.value) if item.valid else None
+  if not seen:
+    return None
+  return distance, (speed if distance is not None else None)
 
 
 def radar_distance(car_data) -> float | None:

@@ -24,7 +24,7 @@ ONE_DECIMAL_KEYS: set[str] = set()  # keys shown with one decimal place, none: t
 STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("rpm", "Engine RPM", "rpm"),
                   ("engine_temp", "Engine temp", "C"), ("drive_time", "Time", "s"), ("odometer", "Odometer", "km"))
 DURATION_KEYS = {"drive_time"}  # seconds, shown as h:mm
-HIDDEN_KEYS = {"lead_distance", "friction_brake_force"}  # drawn on the driving screen only, not looked at while driving
+HIDDEN_KEYS = {"lead_distance", "friction_brake_force", "radar_distance", "radar_rel_speed"}  # driving screen / warnings only
 LAST_USEFUL_KEY = "odometer"  # after everything else that is useful, before the experimental tiles
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit

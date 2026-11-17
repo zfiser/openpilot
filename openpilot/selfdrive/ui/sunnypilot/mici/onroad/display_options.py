@@ -8,7 +8,8 @@ import time
 from collections.abc import Callable
 
 GPS_SPEED, LEAD_DISTANCE, BRAKE_DOT, RPM = "ShowGpsSpeed", "ShowLeadDistance", "ShowBrakeDot", "ShowRpm"
-KEYS = (GPS_SPEED, LEAD_DISTANCE, BRAKE_DOT, RPM)
+RADAR_DOT = "ShowRadarDot"
+KEYS = (GPS_SPEED, LEAD_DISTANCE, BRAKE_DOT, RPM, RADAR_DOT)
 REFRESH_SECONDS = 1.0  # the settings are read this often instead of on every frame
 
 

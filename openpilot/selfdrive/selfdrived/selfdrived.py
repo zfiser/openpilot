@@ -34,7 +34,7 @@ from openpilot.sunnypilot.selfdrive.selfdrived.button_state_tracker import Butto
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.selfdrived.fun_odometer import FUN, FAR, NEAR, odometer_from
 from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import ClosingWarning, COLLISION as CLOSING_COLLISION, \
-  DISTRACTED as CLOSING_DISTRACTED, APPEARED as CLOSING_APPEARED, radar_distance, looking_away as closing_looking_away
+  DISTRACTED as CLOSING_DISTRACTED, APPEARED as CLOSING_APPEARED, radar_distance, radar_lead, looking_away as closing_looking_away
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -122,6 +122,7 @@ class SelfdriveD:
     self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
     self.closing_warning = ClosingWarning()  # fork: chime when closing in on the car ahead, see closing_warning.py
     self.closing_warning_on = True
+    self.closing_warning_raw_radar = True  # the ClosingWarningRawRadar setting
 
     car_recognized = self.CP.brand != 'mock'
 
@@ -299,7 +300,12 @@ class SelfdriveD:
         # the car's radar (carData, the number on the driving screen), only while carStateSP is fresh
         fresh = self.sm.frame - self.sm.recv_frame['carStateSP'] < int(0.5 / DT_CTRL)
         if self.closing_warning_on and fresh:
-          distance = radar_distance(self.sm['carStateSP'].carData)
+          car_data = self.sm['carStateSP'].carData
+          distance = radar_distance(car_data)  # the dashboard number, whole metres at 5 Hz
+          radar_v_rel = None
+          raw = radar_lead(car_data) if self.closing_warning_raw_radar else None
+          if raw is not None:  # the radar's own lead (0.05 m, rel speed, 50 Hz); None: not sent, keep the dashboard number
+            distance, radar_v_rel = raw
           vision = self.sm['radarState'].leadOne  # the camera lead on this car (no radar tracks with stock ACC)
           dm_alive = self.sm.alive['driverMonitoringState']
           vps = self.sm['driverMonitoringState'].visionPolicyState
@@ -307,7 +313,7 @@ class SelfdriveD:
           glance = dm_alive and closing_looking_away(vps)  # a smaller head turn, for a car that appears
           kind = self.closing_warning.update(CS.vEgo, distance, CS.cruiseState.enabled, CS.gasPressed, CS.brakePressed,
                                              CS.leftBlinker or CS.rightBlinker, CS.steeringAngleDeg, distracted, DT_CTRL,
-                                             vision.dRel if vision.present else None, vision.vRel, glance)
+                                             vision.dRel if vision.present else None, vision.vRel, glance, radar_v_rel)
           if kind == CLOSING_COLLISION:
             self.events_sp.add(custom.OnroadEventSP.EventName.closingCollision)
           elif kind == CLOSING_DISTRACTED:
@@ -708,6 +714,10 @@ class SelfdriveD:
         self.closing_warning.appear_on = self.params.get_bool("ClosingWarningAppear")
       except Exception:
         self.closing_warning.appear_on = True  # unknown key before the reboot: keep the chime as before
+      try:
+        self.closing_warning_raw_radar = self.params.get_bool("ClosingWarningRawRadar")
+      except Exception:
+        self.closing_warning_raw_radar = False  # unknown key before the reboot: the dashboard number as before
       time.sleep(0.1)
 
   def run(self):

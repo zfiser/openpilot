@@ -149,6 +149,8 @@ class ModelRenderer(Widget, ModelRendererSP):
     else:
       self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
 
+    self.radar_dot.draw(self, sm)  # fork: the radar lead, see sunnypilot radar_dot.py (never raises)
+
   def _update_raw_points(self, model):
     """Update raw 3D points from model data"""
     self._path.raw_points = np.array([model.position.x, np.array(model.position.y) + self._camera_offset, model.position.z], dtype=np.float32).T

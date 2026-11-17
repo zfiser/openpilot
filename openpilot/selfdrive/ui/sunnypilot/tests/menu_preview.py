@@ -34,7 +34,7 @@ def main() -> None:
     from openpilot.selfdrive.ui.sunnypilot.mici.layouts import quick_settings as qs
     pages = [("0_menu", qs.TogglesMenu()), ("1_steering", qs.steering_panel()), ("2_lane_change", qs.lane_change_panel()),
              ("3_blinker", qs.blinker_panel()), ("4_screen", qs.screen_panel()), ("5_driving_screen", qs.driving_screen_panel()),
-             ("5_driving_screen_warning", qs.driving_screen_panel()),
+             ("5_driving_screen_warning", qs.driving_screen_panel()), ("5_driving_screen_radar_dot", qs.driving_screen_panel()),
              ("6_other", qs.TogglesLayoutMici()), ("7_hug", qs.hug_panel()), ("8_hug_end", qs.hug_panel())]
 
     step, wait = 0, 0
@@ -45,9 +45,10 @@ def main() -> None:
       if wait == 20 and pages[step][0] == "8_hug_end":  # scroll so the last item of the hug page shows
         panel = pages[step][1]
         panel._scroller.scroll_to(panel._items[-1].rect.x - panel._scroller.rect.x - 20)
-      if wait == 20 and pages[step][0] == "5_driving_screen_warning":  # scroll to the new car ahead toggle
+      scroll_item = {"5_driving_screen_warning": 7, "5_driving_screen_radar_dot": 3}.get(pages[step][0])  # raw radar, radar dot
+      if wait == 20 and scroll_item is not None:
         panel = pages[step][1]
-        panel._scroller.scroll_to(panel._items[5].rect.x - panel._scroller.rect.x - 20)
+        panel._scroller.scroll_to(panel._items[scroll_item].rect.x - panel._scroller.rect.x - 20)
       if wait > 50:
         name = pages[step][0]
         image = rl.load_image_from_screen()

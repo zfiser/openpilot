@@ -15,6 +15,7 @@ The values animate (lead distance, confidence, steering, driver head, car data).
 Add --shots DIR to render every scenario headless and save PNGs of the road view and the car data page.
 """
 import argparse
+import json
 import math
 import os
 import time
@@ -51,7 +52,12 @@ SCENARIOS = {
   rl.KeyboardKey.KEY_EIGHT: ("lateral only, alert on screen (the RPM hides)", False, False, False,
                              [("odometer", "Odometer", 54321.0, "km", True), ("rpm", "Engine RPM", 1800.0, "rpm", True)], 0.9, True,
                              "Changing Lanes"),
+  # a real moment of 16 Nov (route 0x9c, segment 65): model path and lanes, the camera lead and the radar lead (radar dot)
+  rl.KeyboardKey.KEY_NINE: ("radar dot, real road", False, False, False, [("odometer", "Odometer", 54321.0, "km", True)], 0.9, True,
+                            None, "road"),
 }
+
+ROAD = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_preview_road.json")))  # see KEY_NINE
 
 
 def animate_item(item, t: float):
@@ -75,6 +81,11 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   fixed_confidence = extra[0] if extra else None
   lat_only = bool(extra[1]) if len(extra) > 1 else False
   alert_text = extra[2] if len(extra) > 2 else None  # a message that covers the top of the road view
+  road = len(extra) > 3 and extra[3] == "road"  # the recorded road of ui_preview_road.json
+  if road:
+    items = list(items) + [("lead_distance", "Lead distance", ROAD["lead_distance"], "m", True),
+                           ("radar_distance", "Radar distance", ROAD["radar_distance"], "m", True),
+                           ("radar_rel_speed", "Radar rel speed", ROAD["radar_rel_speed"], "m/s", True)]
   moving = (enabled or lat_only) and not stop
   if t is not None:
     items = [animate_item(item, t) for item in items]
@@ -119,8 +130,11 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   pm.send('selfdriveStateSP', ssp)
 
   rs = messaging.new_message('radarState')
-  rs.radarState.leadOne.present = lead
-  rs.radarState.leadOne.dRel = lead_distance
+  rs.radarState.leadOne.present = lead or road
+  rs.radarState.leadOne.dRel = ROAD["lead"]["dRel"] if road else lead_distance
+  if road:
+    rs.radarState.leadOne.yRel = ROAD["lead"]["yRel"]
+    rs.radarState.leadOne.vRel = ROAD["lead"]["vRel"]
   pm.send('radarState', rs)
 
   gps = messaging.new_message('gpsLocationExternal')
@@ -129,7 +143,7 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   pm.send('gpsLocationExternal', gps)
 
   car = messaging.new_message('carState')
-  car.carState.vEgo = 20.0 if moving else 0.0
+  car.carState.vEgo = ROAD["vEgo"] if road else (20.0 if moving else 0.0)
   car.carState.standstill = not moving
   car.carState.steeringAngleDeg = steering_angle
   car.carState.cruiseState.available = True
@@ -141,7 +155,24 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   # lateral only looks at the steering override probability, fully engaged at the product of both
   mv.modelV2.meta.disengagePredictions.brakeDisengageProbs = [0.0 if lat_only else 1.0 - confidence]
   mv.modelV2.meta.disengagePredictions.steerOverrideProbs = [1.0 - confidence if lat_only else 0.0]
+  if road:
+    for k in "xyz":
+      setattr(mv.modelV2.position, k, ROAD["position"][k])
+    lanes = mv.modelV2.init("laneLines", len(ROAD["laneLines"]))
+    for out, line in zip(lanes, ROAD["laneLines"], strict=True):
+      out.x, out.y, out.z = line["x"], line["y"], line["z"]
+    mv.modelV2.laneLineProbs = ROAD["laneLineProbs"]
+    mv.modelV2.roadEdgeStds = [0.4, 0.4]  # not in the fixture; any confident value
+    edges = mv.modelV2.init("roadEdges", len(ROAD["roadEdges"]))
+    for out, line in zip(edges, ROAD["roadEdges"], strict=True):
+      out.x, out.y, out.z = line["x"], line["y"], line["z"]
   pm.send('modelV2', mv)
+
+  cal = messaging.new_message('extrinsicsCalibration')
+  cal.extrinsicsCalibration.rpyCalib = ROAD["rpyCalib"] if road else [0.0, 0.0, 0.0]
+  cal.extrinsicsCalibration.height = ROAD["height"]
+  cal.extrinsicsCalibration.calStatus = log.ExtrinsicsCalibration.Status.calibrated
+  pm.send('extrinsicsCalibration', cal)
 
   dm = messaging.new_message('driverMonitoringState')
   dm.driverMonitoringState.activePolicy = log.DriverMonitoringState.MonitoringPolicy.vision
@@ -187,6 +218,9 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
     hug_msg.modelDataV2SP.hugAuto = page_name == "hug_arrow_right"
     pm.send('modelDataV2SP', hug_msg)
     ui_state.update()
+    road_view = layout._car_onroad_layout
+    if len(scenario) > 8 and scenario[8] == "road" and road_view._content_rect.width > 0:
+      road_view._calc_frame_matrix(road_view._content_rect)  # no video in the preview: set the road projection the camera view would
     hug = getattr(layout._car_onroad_layout, "_hug_screen", None)
     if hug is not None:
       if wait == 0:  # once per shot: a write every frame would never settle
@@ -243,7 +277,7 @@ def main() -> None:
 
     pm = PubMaster(["deviceState", "pandaStates", "selfdriveState", "radarState", "longitudinalPlan", "carStateSP", "carState", "modelV2",
                    "driverMonitoringState", "driverStateV2", "peripheralState", "selfdriveStateSP", "gpsLocationExternal",
-                   "modelDataV2SP"])
+                   "modelDataV2SP", "extrinsicsCalibration"])
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)

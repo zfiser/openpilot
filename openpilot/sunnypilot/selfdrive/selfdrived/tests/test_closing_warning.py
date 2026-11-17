@@ -8,7 +8,7 @@ import math
 from types import SimpleNamespace
 
 from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import (APPEARED, COLLISION, COOLDOWN, DISTRACTED, ClosingWarning, LeadRate,
-                                                                       looking_away, radar_distance)
+                                                                       looking_away, radar_distance, radar_lead)
 
 DT = 0.01
 V = 25.0  # m/s, 90 km/h
@@ -190,6 +190,25 @@ class TestClosingWarning:
     run(cw, 2.0, d=18.0, closing=0.0, distracted=True)
     run(cw, 0.4, present=False, distracted=True)
     assert run(cw, 0.05, d=18.0, closing=0.0, distracted=True) == []
+
+  def test_radar_lead_items(self):
+    item = lambda k, v, ok: SimpleNamespace(key=k, value=v, valid=ok)  # noqa: E731
+    assert radar_lead([item("lead_distance", 40.0, True)]) is None  # the car sends no radar data: use the dashboard
+    assert radar_lead([item("radar_distance", 40.25, True), item("radar_rel_speed", -3.5, True)]) == (40.25, -3.5)
+    assert radar_lead([item("radar_distance", 0.0, False), item("radar_rel_speed", 0.0, False)]) == (None, None)  # no lead
+    assert radar_lead([item("radar_distance", 40.0, True), item("radar_rel_speed", 0.0, False)]) == (40.0, None)
+
+  def test_radar_rel_speed_is_used(self):
+    # the distance stays at 40 m (no slope) but the radar says the gap closes at 15 m/s: ttc 2.7 s, distracted chime
+    cw = ClosingWarning()
+    out = []
+    for _ in range(100):
+      k = cw.update(V, 40.0, False, False, False, False, 0.0, True, DT, radar_v_rel=-15.0)
+      if k:
+        out.append(k)
+    assert out == [DISTRACTED]
+    cw = ClosingWarning()
+    assert run(cw, 1.0, d=40.0, closing=0.0, distracted=True) == []  # without it: no closing seen
 
   def test_radar_distance_item(self):
     items = [SimpleNamespace(key="rpm", value=1.0, valid=True), SimpleNamespace(key="lead_distance", value=23.0, valid=True)]
