@@ -16,19 +16,19 @@ jump to a nearer car counts as a cut-in. While not looking, the soft chime comes
 - COLLISION, whatever the driver camera says: the gap would be gone in under COLLISION_TTC at the current closing speed.
 - DISTRACTED, only while the driver camera reports the driver not looking: the gap would be gone in under DISTRACTED_TTC, or
   the car follows closer than DISTRACTED_GAP while still closing.
-- DISTRACTED also (setting ClosingWarningAppear, appear_on) when the road ahead was clear and now is not, at any distance
-  the radar sees (up to about 130 m): a car cuts in, or the radar finds a slower car we are catching up on, while the
-  driver looks away (a mirror, the screen). A
-  glance is short, so a look away within APPEAR_WINDOW before or after the car appeared is enough, and a glance counts from
-  a smaller head turn (looking_away) than the driver camera's own "distracted". The same car coming back after a short
-  radar dropout (about the same distance) does not count.
+- APPEARED (setting ClosingWarningAppear, appear_on; own alert and sound, shares the DISTRACTED cooldown) when the road
+  ahead was clear and now is not, at any distance the radar sees (up to about 130 m): a car cuts in, or the radar finds a
+  slower car we are catching up on, while the driver looks away (a mirror, the screen). A glance is short, so a look away
+  within APPEAR_WINDOW before or after the car appeared is enough, and a glance counts from a smaller head turn
+  (looking_away) than the driver camera's own "distracted". The same car coming back after a short radar dropout (about
+  the same distance) does not count.
 
 Never while braking, with a blinker on (overtaking), with the wheel turned (junctions) or below MIN_SPEED.
 """
 import math
 from collections import deque
 
-COLLISION, DISTRACTED = "collision", "distracted"
+COLLISION, DISTRACTED, APPEARED = "collision", "distracted", "appeared"  # APPEARED: a car appeared while looking away
 
 MIN_SPEED = 30 / 3.6  # m/s
 MIN_CLOSING = 1.5  # m/s (5.4 km/h), slower closing never warns (the slope of whole metres is noisy by about 1 m/s)
@@ -100,7 +100,7 @@ class ClosingWarning:
   def update(self, v_ego: float, distance: float | None, acc_on: bool, gas: bool, brake: bool, blinker: bool, wheel_deg: float,
              distracted: bool, dt: float, vision_d: float | None = None, vision_v_rel: float = 0.0,
              looking_away: bool | None = None) -> str | None:
-    """COLLISION or DISTRACTED in the one frame a chime is due, otherwise None. distance: radar metres, None without a lead.
+    """COLLISION, DISTRACTED or APPEARED in the one frame a chime is due, otherwise None. distance: radar metres, None without a lead.
     vision_d / vision_v_rel: openpilot's (camera) lead, its smoother relative speed is used when it is the same car.
     looking_away: a glance away (see looking_away()), for a car that appears; None = distracted."""
     self._t += dt
@@ -145,7 +145,7 @@ class ClosingWarning:
     if appeared_unseen and not want[COLLISION] and self._t - self._last[DISTRACTED] >= COOLDOWN:
       self._last[DISTRACTED] = self._t
       self._appear_t = -1e9
-      return DISTRACTED  # one moment, no persistence
+      return APPEARED  # one moment, no persistence
     for kind in (COLLISION, DISTRACTED):
       held = self._held[kind] + dt if want[kind] else 0.0
       self._held[kind] = held

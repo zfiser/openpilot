@@ -34,7 +34,7 @@ from openpilot.sunnypilot.selfdrive.selfdrived.button_state_tracker import Butto
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.selfdrived.fun_odometer import FUN, FAR, NEAR, odometer_from
 from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import ClosingWarning, COLLISION as CLOSING_COLLISION, \
-  DISTRACTED as CLOSING_DISTRACTED, radar_distance, looking_away as closing_looking_away
+  DISTRACTED as CLOSING_DISTRACTED, APPEARED as CLOSING_APPEARED, radar_distance, looking_away as closing_looking_away
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -312,6 +312,8 @@ class SelfdriveD:
             self.events_sp.add(custom.OnroadEventSP.EventName.closingCollision)
           elif kind == CLOSING_DISTRACTED:
             self.events_sp.add(custom.OnroadEventSP.EventName.closingDistracted)
+          elif kind == CLOSING_APPEARED:
+            self.events_sp.add(custom.OnroadEventSP.EventName.closingAppeared)
       except Exception:
         pass
 

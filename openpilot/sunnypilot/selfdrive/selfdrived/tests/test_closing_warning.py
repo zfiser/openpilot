@@ -7,7 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 import math
 from types import SimpleNamespace
 
-from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import (COLLISION, COOLDOWN, DISTRACTED, ClosingWarning, LeadRate,
+from openpilot.sunnypilot.selfdrive.selfdrived.closing_warning import (APPEARED, COLLISION, COOLDOWN, DISTRACTED, ClosingWarning, LeadRate,
                                                                        looking_away, radar_distance)
 
 DT = 0.01
@@ -85,13 +85,13 @@ class TestClosingWarning:
   def test_cut_in(self):
     cw = ClosingWarning()
     run(cw, 1.5, present=False, distracted=True)
-    assert run(cw, 0.05, d=18.0, closing=0.0, distracted=True) == [DISTRACTED]  # 0.7 s gap, the car just appeared
+    assert run(cw, 0.05, d=18.0, closing=0.0, distracted=True) == [APPEARED]  # 0.7 s gap, the car just appeared
     cw = ClosingWarning()
     run(cw, 1.5, present=False)
     assert run(cw, 0.05, d=18.0, closing=0.0) == []  # looking: no chime
     cw = ClosingWarning()
     run(cw, 1.5, present=False, distracted=True)
-    assert run(cw, 0.05, d=120.0, closing=0.0, distracted=True) == [DISTRACTED]  # any distance: the road is no longer clear
+    assert run(cw, 0.05, d=120.0, closing=0.0, distracted=True) == [APPEARED]  # any distance: the road is no longer clear
     cw = ClosingWarning()
     run(cw, 1.5, present=False, acc=True, distracted=True)
     assert run(cw, 0.5, d=40.0, closing=0.0, acc=True, distracted=True) == []  # ACC holds the speed: no chime
@@ -102,11 +102,11 @@ class TestClosingWarning:
     run(cw, 1.5, present=False)
     run(cw, 0.2, present=False, distracted=True)
     run(cw, 0.4, present=False)
-    assert run(cw, 0.05, d=18.0, closing=0.0) == [DISTRACTED]
+    assert run(cw, 0.05, d=18.0, closing=0.0) == [APPEARED]
     cw = ClosingWarning()
     run(cw, 1.5, present=False)
     run(cw, 0.5, d=18.0, closing=0.0)
-    assert run(cw, 0.2, d=18.0, closing=0.0, distracted=True) == [DISTRACTED]  # glanced away right after it appeared
+    assert run(cw, 0.2, d=18.0, closing=0.0, distracted=True) == [APPEARED]  # glanced away right after it appeared
     # too long before or after: no chime
     cw = ClosingWarning()
     run(cw, 1.5, present=False, distracted=True)
@@ -129,7 +129,7 @@ class TestClosingWarning:
     cw = ClosingWarning()
     run(cw, 3.0, present=False)
     run(cw, 0.3, present=False, look=True)
-    assert run(cw, 0.5, d=125.0, closing=8.0) == [DISTRACTED]
+    assert run(cw, 0.5, d=125.0, closing=8.0) == [APPEARED]
     # but not for the closing rules: following closely while closing and only glancing does not chime
     cw = ClosingWarning()
     assert run(cw, 3.0, d=15.0, closing=2.0, look=True) == []
@@ -146,7 +146,7 @@ class TestClosingWarning:
   def test_one_chime_per_appearance(self):
     cw = ClosingWarning()
     run(cw, 1.5, present=False)
-    assert run(cw, 0.8, d=60.0, closing=0.0, look=True) == [DISTRACTED]
+    assert run(cw, 0.8, d=60.0, closing=0.0, look=True) == [APPEARED]
     run(cw, 20.0, d=60.0, closing=0.0, look=True)  # still the same car after the cooldown: nothing new
     assert run(cw, 1.0, d=60.0, closing=0.0, look=True) == []
 
@@ -158,16 +158,16 @@ class TestClosingWarning:
     cw = ClosingWarning()
     run(cw, 2.0, d=118.0, closing=0.0)
     run(cw, 3.0, present=False)
-    assert run(cw, 0.5, d=40.0, closing=0.0, look=True) == [DISTRACTED]  # another car
+    assert run(cw, 0.5, d=40.0, closing=0.0, look=True) == [APPEARED]  # another car
     cw = ClosingWarning()
     run(cw, 2.0, d=118.0, closing=0.0)
     run(cw, 12.0, present=False)  # long gone: a car at that distance is new
-    assert run(cw, 0.5, d=115.0, closing=0.0, look=True) == [DISTRACTED]
+    assert run(cw, 0.5, d=115.0, closing=0.0, look=True) == [APPEARED]
 
   def test_radar_switches_to_a_nearer_car(self):
     cw = ClosingWarning()
     run(cw, 2.0, d=90.0, closing=0.0)
-    assert run(cw, 0.3, d=35.0, closing=0.0, look=True) == [DISTRACTED]
+    assert run(cw, 0.3, d=35.0, closing=0.0, look=True) == [APPEARED]
     cw = ClosingWarning()
     run(cw, 2.0, d=35.0, closing=0.0)
     assert run(cw, 0.3, d=90.0, closing=0.0, look=True) == []  # to a farther car: the road ahead got clearer
