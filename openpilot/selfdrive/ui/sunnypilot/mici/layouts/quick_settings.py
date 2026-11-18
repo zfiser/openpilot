@@ -125,7 +125,7 @@ def driving_screen_panel() -> SettingsPanel:
     BigBoolParam("gps speed", "ShowGpsSpeed"),
     BigBoolParam("lead\ndistance", "ShowLeadDistance"),
     BigBoolParam("brake dot", "ShowBrakeDot"),
-    BigBoolParam("radar dot", "ShowRadarDot"),  # yellow dot on the road where the radar has its lead
+    BigBoolParam("radar\nmarker", "ShowRadarDot"),  # brackets around the car the radar has as its lead (radar_dot.py)
     BigBoolParam("engine rpm", "ShowRpm"),
     BigBoolParam("closing\nwarning", "ClosingWarning"),
     BigBoolParam("new car\nahead", "ClosingWarningAppear"),  # the closing warning's chime for a car that appears ahead

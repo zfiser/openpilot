@@ -27,7 +27,20 @@ def _item(key, value, valid=True):
 
 class TestLeadDistance(unittest.TestCase):
   def test_reads_the_item(self):
-    assert ld.lead_distance(_SM([_item("rpm", 900.0), _item("lead_distance", 23.4)]), 5) == 23
+    assert ld.lead_distance(_SM([_item("rpm", 900.0), _item("lead_distance", 23.0)]), 5) == 23.0
+
+  def test_raw_radar_first(self):
+    assert ld.lead_distance(_SM([_item("lead_distance", 8.0), _item("radar_distance", 7.45)]), 5) == 7.45
+    assert ld.lead_distance(_SM([_item("lead_distance", 8.0), _item("radar_distance", 0.0, valid=False)]), 5) is None  # no lead
+
+  def test_text(self):
+    t = ld.DistanceText()
+    assert t.update(None) is None
+    assert t.update(23.4) == "23" and t.update(10.0) == "10"
+    assert t.update(7.43) == "7.4"
+    assert t.update(7.47) == "7.4"  # less than 0.1 m from the shown value: no flicker
+    assert t.update(7.52) == "7.5"
+    assert t.update(0.2) == "0.2"
 
   def test_invalid_or_missing_is_none(self):
     assert ld.lead_distance(_SM([_item("lead_distance", 0.0, valid=False)]), 5) is None

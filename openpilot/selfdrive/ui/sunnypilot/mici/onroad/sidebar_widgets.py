@@ -12,7 +12,7 @@ from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad import display_options
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator import friction_braking
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.gps_speed import gps_speed
-from openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance import CLOSING, OPENING, LeadTrend, lead_distance
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance import CLOSING, OPENING, DistanceText, LeadTrend, lead_distance
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -42,6 +42,7 @@ class MiciSidebarWidgets(Widget):
     self._confidence_ball = confidence_ball
     self._speed_font = gui_app.font(FontWeight.BOLD)
     self._lead_trend = LeadTrend()
+    self._distance_text = DistanceText()
     self._options = display_options.DisplayOptions(ui_state.params)
     self._speed_left = 0.0  # left edge and vertical centre of the GPS speed digits, where the brake dot goes next to
     self._speed_center_y = 0.0
@@ -82,10 +83,10 @@ class MiciSidebarWidgets(Widget):
     """Metres to the lead above the GPS speed, red while the gap shrinks, green while it grows."""
     distance = lead_distance(ui_state.sm, ui_state.started_frame) if self._options.enabled(display_options.LEAD_DISTANCE) else None
     trend = self._lead_trend.update(distance, time.monotonic())
-    if distance is None:
+    text = self._distance_text.update(distance)
+    if text is None:
       return
     color = LEAD_CLOSING if trend == CLOSING else LEAD_OPENING if trend == OPENING else WHITE
-    text = str(distance)
     measured = measure_text_cached(self._speed_font, text, LEAD_FONT_SIZE)
     speed_height = measure_text_cached(self._speed_font, "0", SPEED_FONT_SIZE).y
     pos = rl.Vector2(rect.x + rect.width - SPEED_RIGHT_MARGIN - measured.x,

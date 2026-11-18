@@ -57,6 +57,13 @@ SCENARIOS = {
                             None, "road"),
 }
 
+# radar marker shapes on the same road: far (the recorded car at 69 m) and close (8 m, closing 3 m/s: orange, decimal distance)
+CLOSE = {"radar_distance": 8.0, "radar_rel_speed": -3.0, "lead_distance": 8.0, "lead": {"dRel": 8.0, "yRel": 0.13, "vRel": -3.0}}
+for _n, _style in enumerate(("bar", "brackets", "chevron")):
+  for _m, (_label, _over) in enumerate((("far", None), ("close", CLOSE))):
+    SCENARIOS[f"marker_{_style}_{_label}"] = (f"radar marker {_style}, {_label}", False, False, False,
+                                              [("odometer", "Odometer", 54321.0, "km", True)], 0.9, True, None, "road", _style, _over)
+
 ROAD = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_preview_road.json")))  # see KEY_NINE
 
 
@@ -82,10 +89,11 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
   lat_only = bool(extra[1]) if len(extra) > 1 else False
   alert_text = extra[2] if len(extra) > 2 else None  # a message that covers the top of the road view
   road = len(extra) > 3 and extra[3] == "road"  # the recorded road of ui_preview_road.json
+  R = dict(ROAD, **extra[5]) if len(extra) > 5 and extra[5] else ROAD  # a road scene with other radar / lead values
   if road:
-    items = list(items) + [("lead_distance", "Lead distance", ROAD["lead_distance"], "m", True),
-                           ("radar_distance", "Radar distance", ROAD["radar_distance"], "m", True),
-                           ("radar_rel_speed", "Radar rel speed", ROAD["radar_rel_speed"], "m/s", True)]
+    items = list(items) + [("lead_distance", "Lead distance", R["lead_distance"], "m", True),
+                           ("radar_distance", "Radar distance", R["radar_distance"], "m", True),
+                           ("radar_rel_speed", "Radar rel speed", R["radar_rel_speed"], "m/s", True)]
   moving = (enabled or lat_only) and not stop
   if t is not None:
     items = [animate_item(item, t) for item in items]
@@ -131,10 +139,10 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
 
   rs = messaging.new_message('radarState')
   rs.radarState.leadOne.present = lead or road
-  rs.radarState.leadOne.dRel = ROAD["lead"]["dRel"] if road else lead_distance
+  rs.radarState.leadOne.dRel = R["lead"]["dRel"] if road else lead_distance
   if road:
-    rs.radarState.leadOne.yRel = ROAD["lead"]["yRel"]
-    rs.radarState.leadOne.vRel = ROAD["lead"]["vRel"]
+    rs.radarState.leadOne.yRel = R["lead"]["yRel"]
+    rs.radarState.leadOne.vRel = R["lead"]["vRel"]
   pm.send('radarState', rs)
 
   gps = messaging.new_message('gpsLocationExternal')
@@ -196,12 +204,14 @@ def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log
 
 def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
   from openpilot.system.ui.lib.application import gui_app
+  from openpilot.selfdrive.ui.sunnypilot.mici.onroad.radar_dot import STYLE as RADAR_STYLE
 
   os.makedirs(out_dir, exist_ok=True)
   frame = 0
   plan = []  # (frame to shoot at, scenario index, page name, page widget)
   for idx, scenario in enumerate(SCENARIOS.values(), 1):
-    for page_name, page in (("road", layout._car_onroad_layout), ("data", layout._car_data_layout)):
+    pages = (("road", layout._car_onroad_layout),) if len(scenario) > 9 else (("road", layout._car_onroad_layout), ("data", layout._car_data_layout))
+    for page_name, page in pages:
       plan.append((scenario, idx, page_name, page))
     if scenario[0].startswith("lateral only, medium"):  # steering: the hug screen open, and the arrows with it closed
       plan.append((scenario, idx, "hug_open", layout._car_onroad_layout))
@@ -219,6 +229,7 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
     pm.send('modelDataV2SP', hug_msg)
     ui_state.update()
     road_view = layout._car_onroad_layout
+    road_view._model_renderer.radar_dot.style = scenario[9] if len(scenario) > 9 else RADAR_STYLE
     if len(scenario) > 8 and scenario[8] == "road" and road_view._content_rect.width > 0:
       road_view._calc_frame_matrix(road_view._content_rect)  # no video in the preview: set the road projection the camera view would
     hug = getattr(layout._car_onroad_layout, "_hug_screen", None)
@@ -236,7 +247,8 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
       layout._scroll_to(page)
     wait += 1
     if wait > 120:  # let the swipe animation and the filters settle
-      path = os.path.join(out_dir, f"{idx}_{page_name}.png")
+      shot = scenario[0].replace("radar marker ", "marker_").replace(", ", "_") if len(scenario) > 9 else f"{idx}_{page_name}"
+      path = os.path.join(out_dir, f"{shot}.png")
       image = rl.load_image_from_screen()
       rl.export_image(image, path)
       rl.unload_image(image)

@@ -67,7 +67,7 @@ def _load_sidebar():
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator": _stub_module(
       "openpilot.selfdrive.ui.sunnypilot.mici.onroad.brake_indicator", friction_braking=mock.MagicMock(return_value=False)),
     "openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance": _stub_module(
-      "openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance", CLOSING=-1, OPENING=1, LeadTrend=mock.MagicMock(),
+      "openpilot.selfdrive.ui.sunnypilot.mici.onroad.lead_distance", CLOSING=-1, OPENING=1, LeadTrend=mock.MagicMock(), DistanceText=mock.MagicMock(),
       lead_distance=mock.MagicMock(return_value=None)),
     "openpilot.selfdrive.ui.sunnypilot": _stub_module("openpilot.selfdrive.ui.sunnypilot"),
     "openpilot.selfdrive.ui.sunnypilot.mici": _stub_module("openpilot.selfdrive.ui.sunnypilot.mici"),

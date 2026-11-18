@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from openpilot.selfdrive.ui.sunnypilot.mici.onroad.radar_dot import RADAR_TO_CAMERA, RadarDot, dot_point, project, radar_lead_distance, \
-  radius
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad.radar_dot import AMBER, ORANGE, RADAR_TO_CAMERA, RED, RadarDot, danger_color, \
+  dot_point, fit_box, project, radar_lead_distance, radius
 
 
 def item(key, value, valid=True):
@@ -48,3 +48,18 @@ class TestRadarDot:
   def test_draw_never_raises(self):
     dot = RadarDot(SimpleNamespace(get=lambda k, return_default=True: True))
     dot.draw(SimpleNamespace(), {})  # broken inputs: nothing drawn, no exception
+
+  def test_danger_color(self):
+    assert danger_color(40.0, None) == AMBER and danger_color(40.0, 2.0) == AMBER  # no speed, or pulling away
+    assert danger_color(40.0, -5.0) == AMBER  # 8 s
+    assert danger_color(15.0, -5.0) == ORANGE  # 3 s
+    assert danger_color(8.0, -5.0) == RED  # 1.6 s
+
+  def test_fit_box(self):
+    rect = SimpleNamespace(x=0.0, y=0.0, width=500.0, height=240.0)
+    big = np.array([[-100, 300], [600, 300], [600, -50], [-100, -50]], dtype=np.float32)
+    out = fit_box(big, rect)
+    assert out[:, 0].max() - out[:, 0].min() <= 300.0 + 1e-3
+    assert out[:, 0].min() >= 0 and out[:, 0].max() <= 500 and out[:, 1].min() >= 0 and out[:, 1].max() <= 240
+    small = np.array([[200, 120], [260, 120], [260, 80], [200, 80]], dtype=np.float32)
+    assert np.allclose(fit_box(small, rect), small)
