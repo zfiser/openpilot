@@ -66,7 +66,7 @@ class SettingsLayoutSP(OP.SettingsLayout):
     # developer lives in the toggles menu (4th item, quick_settings.py), not here
     items = [item for item in self._scroller._items if getattr(item, "text", None) != "developer"]
 
-    items.insert(1, models_btn)
+    items.insert(2, models_btn)  # after network (user wish 2026-11-18)
     items.insert(5, sunnylink_btn)
 
     # exit-always-offroad sits at the front while always offroad is on (only one of the two buttons is visible at a time)
