@@ -79,6 +79,10 @@ class NetworkLayoutMici(NavScroller):
     self._esim_button = EsimNetworkButton(self._cellular_manager)
     self._esim_button.set_click_callback(lambda: gui_app.push_widget(self._esim_ui))
 
+    # fork: power the LTE modem off for good (no data plan), modem.py reads the setting every few seconds
+    self._modem_btn = BigParamControl("cellular modem", "CellularModem",
+                                      description="Turn the LTE modem off completely when you have no data plan. Wi-Fi keeps working.")
+
     # ******** Advanced settings ********
     # ******** Roaming toggle ********
     self._roaming_btn = BigParamControl("enable roaming", "GsmRoaming", description="Allow cellular data roaming.")
@@ -97,6 +101,7 @@ class NetworkLayoutMici(NavScroller):
     self._scroller.add_widgets([
       self._wifi_button,
       self._esim_button,
+      self._modem_btn,
       self._network_metered_btn,
       self._tethering_toggle_btn,
       self._tethering_password_btn,

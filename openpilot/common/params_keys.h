@@ -50,6 +50,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"AutoHug", {PERSISTENT | BACKUP, BOOL, "0"}},  // hug the left line in the left-most lane, the right line in the right-most lane (highway)
     {"ClosingWarning", {PERSISTENT | BACKUP, BOOL, "1"}},  // chime when closing in on the car ahead while the driver controls the speed
     {"ClosingWarningAppear", {PERSISTENT | BACKUP, BOOL, "1"}},  // closing warning: also chime when a car appears ahead while the driver looks away
+    {"CellularModem", {PERSISTENT | BACKUP, BOOL, "1"}},  // fork: off powers the LTE modem down (modem.py), for a device without a data plan
     {"ShowRadarDot", {PERSISTENT | BACKUP, BOOL, "1"}},  // driving screen: yellow dot where the radar has its lead (radar_dot.py)
     {"ClosingWarningRawRadar", {PERSISTENT | BACKUP, BOOL, "1"}},  // closing warning: the radar's raw lead (0.05 m, rel speed, 50 Hz) instead of the dashboard distance
     {"AutoHugMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},  // km/h, auto hug starts from this speed and stops 10 km/h below it

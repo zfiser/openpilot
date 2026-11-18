@@ -107,9 +107,14 @@ class State(Enum):
   CONNECTING = "CONNECTING"
   CONNECTED = "CONNECTED"
   DISCONNECTING = "DISCONNECTING"
+  OFF = "OFF"  # fork: the CellularModem setting is off, the modem is powered down
 
 
 STATE_WAIT = 1.0  # seconds to wait after each state handler returns
+# fork: the CellularModem setting (default on). Off: the modem is powered down with the system's own script and left alone.
+LTE_SCRIPT = "/usr/comma/lte/lte.sh"
+OFF_WAIT = 5.0  # s between checks while off (the setting, or something powering the modem up again, e.g. the eSIM screen)
+OFF_RETRY = 30.0  # s at least between two power downs, a modem that keeps coming back is not pulsed in a loop
 
 
 class PPPSession:
@@ -217,6 +222,7 @@ class Modem:
     self._roaming_allowed = True
     self.running = True
     self.S = INITIAL_STATE.copy()
+    self._off_since = -1e9  # time of the last power down (fork, CellularModem off)
 
   @staticmethod
   def _read_param(key):
@@ -432,7 +438,7 @@ class Modem:
     return False
 
   def _check_iccid(self, state):
-    if state in (State.INITIALIZING, State.DISCONNECTING) or not self.S["iccid"]:
+    if state in (State.INITIALIZING, State.DISCONNECTING, State.OFF) or not self.S["iccid"]:
       return
     iccid = (self._atv("AT+QCCID", "+QCCID:") or "").rstrip("F")
     if iccid and iccid != self.S["iccid"]:
@@ -588,10 +594,21 @@ class Modem:
       State.CONNECTING: self._do_connecting,
       State.CONNECTED: self._do_connected,
       State.DISCONNECTING: self._do_disconnecting,
+      State.OFF: self._do_off,
     }
 
     while self.running:
       try:
+        wanted = self._modem_wanted()
+        if not wanted and state != State.OFF:
+          self._power_off()
+          logging.info(f"{state.value} -> {State.OFF.value}")
+          state = State.OFF
+        elif wanted and state == State.OFF:
+          self._power_on()
+          self._publish_state(state=State.INITIALIZING.value)
+          logging.info(f"{State.OFF.value} -> {State.INITIALIZING.value}")
+          state = State.INITIALIZING
         self._check_iccid(state)
         prev = state
         state = handlers[state]()
@@ -600,8 +617,44 @@ class Modem:
           logging.info(f"{prev.value} -> {state.value}")
       except Exception:
         logging.exception(f"error in {state.value}")
-        state = State.DISCONNECTING
-      time.sleep(STATE_WAIT)
+        state = State.OFF if state == State.OFF else State.DISCONNECTING
+      time.sleep(OFF_WAIT if state == State.OFF else STATE_WAIT)
+
+  def _modem_wanted(self) -> bool:
+    """The CellularModem setting: only an explicit "0" turns the modem off (unset or unreadable = on, as before)."""
+    try:
+      return self._read_param("CellularModem") != "0"
+    except Exception:
+      return True
+
+  def _power_off(self) -> None:
+    """Ends the data session and powers the modem down. Never raises."""
+    logging.info("CellularModem off: powering the modem down")
+    try:
+      self._ppp.kill()
+      self._ppp.cleanup_routes()
+    except Exception:
+      logging.exception("stopping the data session failed")
+    self.S = INITIAL_STATE.copy()
+    self._publish_state(state=State.OFF.value)
+    try:
+      subprocess.run(["sudo", LTE_SCRIPT, "stop"], capture_output=True, timeout=60)
+    except Exception:
+      logging.exception("lte.sh stop failed")
+    self._off_since = time.monotonic()
+
+  def _power_on(self) -> None:
+    logging.info("CellularModem on: powering the modem up")
+    try:
+      subprocess.run(["sudo", LTE_SCRIPT, "start"], capture_output=True, timeout=120)
+    except Exception:
+      logging.exception("lte.sh start failed")
+
+  def _do_off(self) -> State:
+    """While off: power the modem down again when something brought it back (not more often than OFF_RETRY)."""
+    if os.path.exists(AT_PORT) and time.monotonic() - self._off_since >= OFF_RETRY:
+      self._power_off()
+    return State.OFF
 
   def stop(self):
     self.running = False
