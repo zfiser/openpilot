@@ -82,6 +82,21 @@ class TestScreenState(unittest.TestCase):
     s.update(9.0)
     assert not s.is_open
 
+  def test_closes_one_second_after_a_button_tap(self):
+    s = h.HugScreenState()
+    s.open(0.0)
+    s.pressed(2.0)
+    s.update(2.9)
+    assert s.is_open
+    s.pressed(2.5)  # a second tap (level 1 -> 2) starts the second again
+    s.update(3.4)
+    assert s.is_open
+    s.update(3.5)
+    assert not s.is_open
+    s.open(10.0)  # opened again: no tap pending, the 5 s idle close as before
+    s.update(14.9)
+    assert s.is_open
+
   def test_a_second_pull_closes(self):
     s = h.HugScreenState()
     s.toggle(0.0)

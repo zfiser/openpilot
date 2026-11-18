@@ -13,6 +13,7 @@ LEFT, CENTER, RIGHT = 1, 0, -1
 PULL_DOWN_MIN = 40.0  # px down before a drag opens (or closes) the screen
 SIDEWAYS_MAX = 12.0  # px sideways, beyond that the page scroller takes the drag
 CLOSE_AFTER = 5.0  # s after the last touch
+TAP_CLOSE_AFTER = 1.0  # s after a button (left / auto / right) was tapped; another tap in that time starts it again
 
 
 def next_mode(current: int, pressed: int) -> int:
@@ -73,19 +74,23 @@ class PullDown:
 
 
 class HugScreenState:
-  """Open or closed, closing CLOSE_AFTER seconds after the last touch."""
+  """Open or closed, closing CLOSE_AFTER seconds after the last touch, or TAP_CLOSE_AFTER after a button was tapped."""
 
-  def __init__(self, close_after: float = CLOSE_AFTER):
+  def __init__(self, close_after: float = CLOSE_AFTER, tap_close_after: float = TAP_CLOSE_AFTER):
     self._close_after = close_after
+    self._tap_close_after = tap_close_after
     self.is_open = False
     self._last_touch = 0.0
+    self._close_at: float | None = None  # set by a button tap
 
   def open(self, now: float) -> None:
     self.is_open = True
     self._last_touch = now
+    self._close_at = None
 
   def close(self) -> None:
     self.is_open = False
+    self._close_at = None
 
   def toggle(self, now: float) -> None:
     if self.is_open:
@@ -96,9 +101,14 @@ class HugScreenState:
   def touched(self, now: float) -> None:
     self._last_touch = now
 
+  def pressed(self, now: float) -> None:
+    """A button was tapped: close TAP_CLOSE_AFTER from now (the choice is made, the road comes back quickly)."""
+    self._last_touch = now
+    self._close_at = now + self._tap_close_after
+
   def update(self, now: float) -> None:
-    if self.is_open and now - self._last_touch >= self._close_after:
-      self.is_open = False
+    if self.is_open and (now - self._last_touch >= self._close_after or (self._close_at is not None and now >= self._close_at)):
+      self.close()
 
 
 def press(current_mode: int, auto_on: bool, column: int) -> tuple[int, bool]:

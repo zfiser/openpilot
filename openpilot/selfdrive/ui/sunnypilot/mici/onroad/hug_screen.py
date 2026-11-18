@@ -149,6 +149,7 @@ class HugScreen:
     column = column_of(pos.x, rect.x, rect.width)
     if column == CENTER or steering():  # the automatic hug can be set any time, a manual one only while steering
       self._put(*press(self._mode, self._auto, column))
+    self._state.pressed(time.monotonic())  # closes 1 s after the tap (TAP_CLOSE_AFTER)
     return True
 
   # drawing
