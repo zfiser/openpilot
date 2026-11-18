@@ -26,7 +26,7 @@ class EsimNetworkButton(BigButton):
 
   def _update_state(self):
     super()._update_state()
-    self.set_enabled(self._cellular_manager.is_euicc is not False)
+    self.set_enabled(self._cellular_manager.is_euicc is not False and not self._cellular_manager.modem_off)
     text, value, icon = self._compute_state()
     self.set_text(text)
     self.set_value(value)
@@ -35,6 +35,8 @@ class EsimNetworkButton(BigButton):
   def _compute_state(self):
     cm = self._cellular_manager
     none_icon = self._cell_icons[NetworkStrength.unknown]
+    if cm.modem_off:  # fork: the "cellular modem" setting is off
+      return "esim", "modem off", none_icon
     ip = cm.modem_state.get("ip_address") or "connecting..."
     if cm.is_euicc is False:
       iccid = cm.modem_state.get("iccid") or ""

@@ -34,6 +34,11 @@ class CellularManager:
   def modem_state(self) -> dict:
     return self._modem_state
 
+  @property
+  def modem_off(self) -> bool:
+    """fork: the CellularModem setting powered the modem down (modem.py state OFF): no eSIM to read."""
+    return self._modem_state.get("state") == "OFF"
+
   def process_callbacks(self):
     with self._callback_lock:
       to_run, self._callback_queue = self._callback_queue, []
@@ -43,7 +48,8 @@ class CellularManager:
     if not self._busy and not self._polling and time.monotonic() - self._last_profile_poll >= self.PROFILE_POLL_INTERVAL_S:
       self._last_profile_poll = time.monotonic()
       self._modem_state = HARDWARE.get_modem_state()
-      self._poll_profiles()
+      if not self.modem_off:  # fork: a powered-down modem only fails, and the eSIM code would try to restart it
+        self._poll_profiles()
 
   @property
   def profiles(self) -> list[Profile]:
