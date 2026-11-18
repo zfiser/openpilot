@@ -23,7 +23,8 @@ jump to a nearer car counts as a car that appeared (a cut-in). While not looking
   (looking_away) than the driver camera's own "distracted". The same car coming back after a short radar dropout (about
   the same distance) does not count.
 
-Never while braking, with a blinker on (overtaking), with the wheel turned (junctions) or below MIN_SPEED.
+Never while braking, with a blinker on (overtaking), with the wheel turned (junctions) or for TURN_HOLD after it was turned
+(coming out of a turn the radar sweeps over parked cars and posts at the roadside), or below MIN_SPEED.
 """
 import math
 from collections import deque
@@ -43,6 +44,7 @@ SAME_CAR_MIN = 8.0  # m
 LOOK_YAW = 15.0  # deg of head turn from straight ahead that counts as a glance away (the camera's "distracted": about 23)
 LOOK_PITCH = 12.0  # deg of head tilt down (the screen, the console)
 MAX_WHEEL = 30.0  # deg, more is a turn
+TURN_HOLD = 2.0  # s after the wheel was past MAX_WHEEL, still no warning (18 Nov: a post at 6 m while unwinding a left turn)
 PERSIST = 0.3  # s, the condition must hold this long (a single radar glitch does not chime)
 COOLDOWN = 15.0  # s between two chimes of the same kind
 RATE_WINDOW = 1.0  # s of distances for the closing speed
@@ -94,6 +96,7 @@ class ClosingWarning:
     self._look_t = -1e9  # time the driver last looked away
     self._lost_t = -1e9  # time and distance the last lead was lost
     self._lost_d = 0.0
+    self._turn_t = -1e9  # time the wheel was last past MAX_WHEEL
     self._rate = LeadRate()
     self.appear_on = True  # the ClosingWarningAppear setting: the chime for a car that appears while looking away
 
@@ -131,7 +134,10 @@ class ClosingWarning:
       rate = radar_v_rel  # measured by the radar itself for exactly this lead
 
     driver_controls_speed = (not acc_on) or gas
-    if not (driver_controls_speed and distance is not None and v_ego >= MIN_SPEED) or brake or blinker or abs(wheel_deg) > MAX_WHEEL:
+    if abs(wheel_deg) > MAX_WHEEL:
+      self._turn_t = self._t
+    turning = self._t - self._turn_t < TURN_HOLD
+    if not (driver_controls_speed and distance is not None and v_ego >= MIN_SPEED) or brake or blinker or turning:
       self._held = dict.fromkeys(self._held, 0.0)
       self._appear_t = -1e9  # a car seen while braking, changing lanes or on ACC never chimes later
       return None

@@ -66,6 +66,18 @@ class TestClosingWarning:
     assert run(ClosingWarning(), 2.0, v=6.0) == []  # 22 km/h
     assert run(ClosingWarning(), 3.0, d=10.0, closing=0.5) == []  # following steadily, hardly closing
 
+  def test_coming_out_of_a_turn(self):
+    # 18 Nov (0x9f 2.74 min): unwinding a left turn at 41 km/h, the radar swept a roadside post from 6.5 m at our own speed
+    cw = ClosingWarning()
+    run(cw, 1.0, v=11.4, wheel=-35.0, present=False)
+    run(cw, 0.8, v=11.4, wheel=-14.0, present=False)  # the wheel back under 30 deg
+    assert run(cw, 0.5, d=6.5, closing=11.4, v=11.4, wheel=-12.0) == []
+    # the same thing 2 s or more after the turn still warns (e.g. stopped traffic behind the bend)
+    cw = ClosingWarning()
+    run(cw, 1.0, v=11.4, wheel=-35.0, present=False)
+    run(cw, 2.1, v=11.4, wheel=-5.0, present=False)
+    assert COLLISION in run(cw, 1.0, d=18.0, closing=11.4, v=11.4, wheel=-3.0)  # needs 0.6 s of readings for a closing speed
+
   def test_steady_whole_metre_jitter_does_not_chime(self):
     cw = ClosingWarning()
     out = []
