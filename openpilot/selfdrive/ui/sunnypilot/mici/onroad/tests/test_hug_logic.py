@@ -71,15 +71,15 @@ class TestPullDown(unittest.TestCase):
 
 
 class TestScreenState(unittest.TestCase):
-  def test_closes_five_seconds_after_the_last_touch(self):
+  def test_closes_three_seconds_after_the_last_touch(self):
     s = h.HugScreenState()
     s.open(0.0)
+    s.update(2.9)
+    assert s.is_open
+    s.touched(2.0)
     s.update(4.9)
     assert s.is_open
-    s.touched(4.0)
-    s.update(8.9)
-    assert s.is_open
-    s.update(9.0)
+    s.update(5.0)
     assert not s.is_open
 
   def test_closes_one_second_after_a_button_tap(self):
@@ -93,8 +93,8 @@ class TestScreenState(unittest.TestCase):
     assert s.is_open
     s.update(3.5)
     assert not s.is_open
-    s.open(10.0)  # opened again: no tap pending, the 5 s idle close as before
-    s.update(14.9)
+    s.open(10.0)  # opened again: no tap pending, the 3 s idle close
+    s.update(12.9)
     assert s.is_open
 
   def test_a_second_pull_closes(self):

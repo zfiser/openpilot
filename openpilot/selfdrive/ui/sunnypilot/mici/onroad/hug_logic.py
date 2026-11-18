@@ -12,7 +12,7 @@ left), the size the level 1 or 2, 0 the center. AutoHug is the automatic hug (su
 LEFT, CENTER, RIGHT = 1, 0, -1
 PULL_DOWN_MIN = 40.0  # px down before a drag opens (or closes) the screen
 SIDEWAYS_MAX = 12.0  # px sideways, beyond that the page scroller takes the drag
-CLOSE_AFTER = 5.0  # s after the last touch
+CLOSE_AFTER = 3.0  # s after the last touch (5 s until 2026-11-18)
 TAP_CLOSE_AFTER = 1.0  # s after a button (left / auto / right) was tapped; another tap in that time starts it again
 
 

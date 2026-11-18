@@ -6,7 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 
 Pull down on the driving screen: three big buttons over the camera picture, left / auto / right. A side button cycles
 level 1 <-> level 2 of that side (and turns the automatic hug off), the middle one turns the automatic hug on or off.
-Closes 5 s after the last touch or on the next pull down.
+Closes 3 s after the last touch, 1 s after a button tap, or on the next pull down.
 
 While the car hugs a line, a tall narrow arrow sits at that edge of the camera picture ('<' left, '>' right). A tap on it
 ends a manual hug, or pauses the automatic one until the next lane change.
