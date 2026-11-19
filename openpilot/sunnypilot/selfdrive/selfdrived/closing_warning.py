@@ -21,7 +21,8 @@ jump to a nearer car counts as a car that appeared (a cut-in). While not looking
   slower car we are catching up on, while the driver looks away (a mirror, the screen). A glance is short, so a look away
   within APPEAR_WINDOW before or after the car appeared is enough, and a glance counts from a smaller head turn
   (looking_away) than the driver camera's own "distracted". The same car coming back after a short radar dropout (about
-  the same distance) does not count.
+  the same distance) does not count. A car first seen farther than FAR_DISTANCE must stay on the radar FAR_HOLD before the
+  chime (far radar blips of 0.3-0.6 s chimed on 19 Nov); a closer one (a cut-in) chimes at once.
 
 Never while braking, with a blinker on (overtaking), with the wheel turned (junctions) or for TURN_HOLD after it was turned
 (coming out of a turn the radar sweeps over parked cars and posts at the roadside), or below MIN_SPEED.
@@ -38,6 +39,8 @@ DISTRACTED_TTC = 3.0  # s
 DISTRACTED_GAP = 0.5  # s of following distance
 APPEAR_ABSENT = 1.0  # s without a lead before: the road was clear
 APPEAR_WINDOW = 1.0  # s, a look away this long before or after the car appeared counts (a glance is short)
+FAR_DISTANCE = 40.0  # m, a car that appears farther away ...
+FAR_HOLD = 0.7  # s ... must stay this long on the radar before it chimes (the look-away window starts after the hold)
 SAME_CAR_TIME = 10.0  # s, a lead lost this recently that comes back at about the same distance is the same car
 SAME_CAR_TOL = 0.15  # share of the distance (at least SAME_CAR_MIN m)
 SAME_CAR_MIN = 8.0  # m
@@ -94,6 +97,7 @@ class ClosingWarning:
     self._last = {COLLISION: -1e9, DISTRACTED: -1e9}
     self._absent = 0.0  # s without a lead
     self._appear_t = -1e9  # time the lead that is still there appeared (the road was clear before)
+    self._appear_d = 0.0  # its distance then
     self._look_t = -1e9  # time the driver last looked away
     self._lost_t = -1e9  # time and distance the last lead was lost
     self._lost_d = 0.0
@@ -128,7 +132,7 @@ class ClosingWarning:
     if distance is None:
       self._appear_t = -1e9
     elif appeared:
-      self._appear_t = self._t
+      self._appear_t, self._appear_d = self._t, distance
     if distance is not None and vision_d is not None and abs(vision_d - distance) <= max(5.0, VISION_MATCH * distance):
       rate = vision_v_rel  # the same car: the camera's relative speed is smoother than the slope of whole metres
     if distance is not None and radar_v_rel is not None:
@@ -147,7 +151,11 @@ class ClosingWarning:
     closing = -rate if rate is not None else 0.0
     ttc = distance / closing if closing >= MIN_CLOSING else float("inf")
     # the road was clear, a car appeared a moment ago and is still there, and the driver looked away around that moment
-    appeared_unseen = self.appear_on and self._t - self._appear_t <= APPEAR_WINDOW and self._t - self._look_t <= APPEAR_WINDOW
+    # a far one only after FAR_HOLD on the radar (it is still there: a lost lead resets _appear_t)
+    hold = FAR_HOLD if self._appear_d > FAR_DISTANCE else 0.0
+    age = self._t - self._appear_t
+    appeared_unseen = (self.appear_on and hold <= age <= hold + APPEAR_WINDOW and
+                       self._look_t >= self._appear_t - APPEAR_WINDOW)
     want = {
       COLLISION: ttc < COLLISION_TTC,
       DISTRACTED: distracted and (ttc < DISTRACTED_TTC or (closing >= MIN_CLOSING and gap < DISTRACTED_GAP)),

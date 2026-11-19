@@ -66,6 +66,29 @@ class TestClosingWarning:
     assert run(ClosingWarning(), 2.0, v=6.0) == []  # 22 km/h
     assert run(ClosingWarning(), 3.0, d=10.0, closing=0.5) == []  # following steadily, hardly closing
 
+  def test_far_blip_does_not_chime(self):
+    # 19 Nov: a "car" on the radar for 0.3 s at 67 m and 0.6 s at 80 m while looking away
+    cw = ClosingWarning()
+    run(cw, 1.5, present=False, look=True)
+    assert run(cw, 0.6, d=80.0, closing=0.0, look=True) == []
+    assert run(cw, 0.5, present=False, look=True) == []
+    # a real car there stays: it chimes once it was seen for FAR_HOLD
+    cw = ClosingWarning()
+    run(cw, 1.5, present=False, look=True)
+    assert run(cw, 0.69, d=80.0, closing=8.0, look=True) == []
+    assert run(cw, 0.1, d=75.0, closing=8.0, look=True) == [APPEARED]
+    # a close one (a cut-in) at once
+    cw = ClosingWarning()
+    run(cw, 1.5, present=False, look=True)
+    assert run(cw, 0.05, d=25.0, closing=0.0, look=True) == [APPEARED]
+
+  def test_far_car_glance_before_it_appeared_still_counts(self):
+    cw = ClosingWarning()
+    run(cw, 1.5, present=False)
+    run(cw, 0.2, present=False, look=True)  # looked away 0.5 s before the radar found it
+    run(cw, 0.3, present=False)
+    assert run(cw, 1.0, d=110.0, closing=8.0) == [APPEARED]  # chimes after the 0.7 s hold
+
   def test_coming_out_of_a_turn(self):
     # 18 Nov (0x9f 2.74 min): unwinding a left turn at 41 km/h, the radar swept a roadside post from 6.5 m at our own speed
     cw = ClosingWarning()
@@ -103,7 +126,7 @@ class TestClosingWarning:
     assert run(cw, 0.05, d=18.0, closing=0.0) == []  # looking: no chime
     cw = ClosingWarning()
     run(cw, 1.5, present=False, distracted=True)
-    assert run(cw, 0.05, d=120.0, closing=0.0, distracted=True) == [APPEARED]  # any distance: the road is no longer clear
+    assert run(cw, 1.0, d=120.0, closing=0.0, distracted=True) == [APPEARED]  # any distance (a far one after FAR_HOLD)
     cw = ClosingWarning()
     run(cw, 1.5, present=False, acc=True, distracted=True)
     assert run(cw, 0.5, d=40.0, closing=0.0, acc=True, distracted=True) == []  # ACC holds the speed: no chime
@@ -141,7 +164,7 @@ class TestClosingWarning:
     cw = ClosingWarning()
     run(cw, 3.0, present=False)
     run(cw, 0.3, present=False, look=True)
-    assert run(cw, 0.5, d=125.0, closing=8.0) == [APPEARED]
+    assert run(cw, 1.0, d=125.0, closing=8.0) == [APPEARED]
     # but not for the closing rules: following closely while closing and only glancing does not chime
     cw = ClosingWarning()
     assert run(cw, 3.0, d=15.0, closing=2.0, look=True) == []
@@ -166,7 +189,7 @@ class TestClosingWarning:
     cw = ClosingWarning()
     run(cw, 2.0, d=118.0, closing=0.0)
     run(cw, 3.0, present=False)  # lost at 118 m
-    assert run(cw, 0.5, d=112.0, closing=0.0, look=True) == []  # back at about the same distance
+    assert run(cw, 1.5, d=112.0, closing=0.0, look=True) == []  # back at about the same distance
     cw = ClosingWarning()
     run(cw, 2.0, d=118.0, closing=0.0)
     run(cw, 3.0, present=False)
@@ -174,7 +197,7 @@ class TestClosingWarning:
     cw = ClosingWarning()
     run(cw, 2.0, d=118.0, closing=0.0)
     run(cw, 12.0, present=False)  # long gone: a car at that distance is new
-    assert run(cw, 0.5, d=115.0, closing=0.0, look=True) == [APPEARED]
+    assert run(cw, 1.0, d=115.0, closing=0.0, look=True) == [APPEARED]
 
   def test_radar_switches_to_a_nearer_car(self):
     cw = ClosingWarning()
