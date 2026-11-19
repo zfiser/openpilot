@@ -296,7 +296,7 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventNameSP.closingAppeared: {
     ET.PERMANENT: Alert(
-      "New car ahead",
+      "Car ahead",
       "",
       AlertStatus.userPrompt, AlertSize.small,
       Priority.MID, VisualAlert.none, log.SelfdriveState.AudibleAlert.preAlert, 3.),  # pre_alert.wav, not in the car enum

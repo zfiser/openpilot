@@ -185,17 +185,21 @@ class TestClosingWarning:
     assert run(cw, 0.3, d=90.0, closing=0.0, look=True) == []  # to a farther car: the road ahead got clearer
 
   def test_looking_away(self):
-    def vps(yaw=0.0, pitch=0.0, distracted=False, face=True):
+    def vps(yaw=0.0, pitch=0.0, distracted=False, face=True, kind="pose"):
       calib = SimpleNamespace(offset=math.radians(3.0))
       pose = SimpleNamespace(yaw=math.radians(yaw + 3.0), pitch=math.radians(pitch + 3.0), yawCalib=calib, pitchCalib=calib)
-      return SimpleNamespace(isDistracted=distracted, faceDetected=face, pose=pose)
+      types = SimpleNamespace(**{k: distracted and k == kind for k in ("pose", "eye", "phone", "sleep")})
+      return SimpleNamespace(isDistracted=distracted, faceDetected=face, pose=pose, distractedTypes=types)
     assert not looking_away(vps())
     assert not looking_away(vps(yaw=10.0, pitch=8.0))  # looking up (the rear-view mirror tilt) or a little aside
-    assert looking_away(vps(yaw=-18.0))  # the left mirror
+    assert looking_away(vps(yaw=-20.0))  # the left mirror
     assert looking_away(vps(yaw=20.0))
     assert looking_away(vps(pitch=-15.0))  # the screen
     assert looking_away(vps(distracted=True, face=False))
     assert not looking_away(vps(yaw=40.0, face=False))
+    assert not looking_away(vps(yaw=15.5))  # 19 Nov: a small glance at 15 deg while looking ahead
+    assert not looking_away(vps(distracted=True, kind="eye"))  # a blink (eyes closed for 3 frames)
+    assert looking_away(vps(distracted=True, kind="phone"))
 
   def test_a_short_radar_dropout_is_no_cut_in(self):
     cw = ClosingWarning()

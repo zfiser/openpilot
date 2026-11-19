@@ -41,7 +41,8 @@ APPEAR_WINDOW = 1.0  # s, a look away this long before or after the car appeared
 SAME_CAR_TIME = 10.0  # s, a lead lost this recently that comes back at about the same distance is the same car
 SAME_CAR_TOL = 0.15  # share of the distance (at least SAME_CAR_MIN m)
 SAME_CAR_MIN = 8.0  # m
-LOOK_YAW = 15.0  # deg of head turn from straight ahead that counts as a glance away (the camera's "distracted": about 23)
+LOOK_YAW = 18.0  # deg of head turn from straight ahead that counts as a glance away (the camera's "distracted": about 23;
+#                   15 until 2026-11-19: a glance of exactly 15 deg chimed while looking ahead)
 LOOK_PITCH = 12.0  # deg of head tilt down (the screen, the console)
 MAX_WHEEL = 30.0  # deg, more is a turn
 TURN_HOLD = 2.0  # s after the wheel was past MAX_WHEEL, still no warning (18 Nov: a post at 6 m while unwinding a left turn)
@@ -167,11 +168,14 @@ class ClosingWarning:
 
 
 def looking_away(vision_policy_state) -> bool:
-  """A glance away from the road from driverMonitoringState.visionPolicyState: the camera's own "distracted", or the head
-  turned more than LOOK_YAW to a side or tilted more than LOOK_PITCH down (from the learned straight-ahead pose)."""
+  """A glance away from the road from driverMonitoringState.visionPolicyState: the camera's own "distracted" for the head
+  pose, a phone or sleep, or the head turned more than LOOK_YAW to a side or tilted more than LOOK_PITCH down (from the learned
+  straight-ahead pose). Not the "eye" type alone: that is closed eyes, a normal blink is 3 frames of it (19 Nov, twice)."""
   p = vision_policy_state
   if p.isDistracted:
-    return True
+    t = p.distractedTypes
+    if t.pose or t.phone or t.sleep:
+      return True
   if not p.faceDetected:
     return False
   yaw = math.degrees(p.pose.yaw - p.pose.yawCalib.offset)
