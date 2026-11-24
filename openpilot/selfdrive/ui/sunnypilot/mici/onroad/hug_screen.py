@@ -39,6 +39,19 @@ PAD = 12
 READ_EVERY = 0.3  # s
 
 
+def current_hug_side() -> int:
+  """The side the car hugs now (its arrow is on screen), from the model process (manual or automatic), CENTER when unknown.
+  Also used by the driving screen HUD to keep the oil temperature clear of the left arrow."""
+  try:
+    sm = ui_state.sm
+    if not steering() or sm.recv_frame["modelDataV2SP"] < ui_state.started_frame:
+      return CENTER
+    side = int(sm["modelDataV2SP"].hugSide)
+    return LEFT if side > 0 else RIGHT if side < 0 else CENTER
+  except Exception:
+    return CENTER
+
+
 def steering() -> bool:
   return ui_state.status not in (UIStatus.DISENGAGED, UIStatus.LONG_ONLY)
 
@@ -82,15 +95,7 @@ class HugScreen:
     self._state.update(time.monotonic())
 
   def hug_side(self) -> int:
-    """The side the car hugs now, from the model process (manual or automatic), CENTER when unknown."""
-    try:
-      sm = ui_state.sm
-      if not steering() or sm.recv_frame["modelDataV2SP"] < ui_state.started_frame:
-        return CENTER
-      side = int(sm["modelDataV2SP"].hugSide)
-      return LEFT if side > 0 else RIGHT if side < 0 else CENTER
-    except Exception:
-      return CENTER
+    return current_hug_side()
 
   # touch, called by the road view
   def mouse_event(self, mouse_event) -> None:

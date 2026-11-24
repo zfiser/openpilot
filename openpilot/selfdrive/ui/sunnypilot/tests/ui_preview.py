@@ -57,6 +57,24 @@ SCENARIOS = {
                             None, "road"),
 }
 
+# the values read from the ECUs (diag_*), as answered by the car on 24 Nov (analysis 2026-11-23_diag, probe 1 and 2)
+DIAG_ITEMS = [("rpm", "Engine RPM", 1850.0, "rpm", True), ("engine_temp", "Engine temp", 17.0, "C", True),
+              ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True),
+              ("diag_oil_temp", "Oil", 18.0, "C", True), ("diag_coolant", "Coolant", 17.5, "C", True),
+              ("diag_transaxle_oil", "Transaxle oil", 17.0, "C", True), ("diag_mg_inverter", "Motor inverter", 15.0, "C", True),
+              ("diag_gen_inverter", "Generator inverter", 14.0, "C", True), ("diag_inverter_coolant", "Inverter coolant", 19.0, "C", True),
+              ("diag_rear_inverter_coolant", "Rear inverter coolant", 12.0, "C", True), ("diag_boost_upper", "Boost upper", 17.0, "C", True),
+              ("diag_boost_lower", "Boost lower", 17.0, "C", True), ("diag_cabin", "Cabin", 16.0, "C", True),
+              ("diag_compressor", "Compressor", 0.0, "rpm", True), ("diag_compressor_target", "Compressor target", 0.0, "rpm", True),
+              ("diag_ac_power", "A/C power", 0.0, "kW", True), ("diag_12v_v", "12V", 14.48, "V", True),
+              ("diag_12v_a", "12V current", 5.87, "A", True), ("diag_12v_temp", "12V temp", 11.9, "C", True),
+              ("diag_12v_smooth", "12V smoothed", 14.14, "V", True), ("diag_12v_relay", "12V before relay", 11.29, "V", True),
+              ("diag_aux_v", "Aux", 14.38, "V", True), ("diag_12v_km", "Since disconnect", 3124.0, "km", True),
+              *[(f"diag_hv_temp{i}", f"HV {i}", t, "C", True) for i, t in enumerate((15.35, 15.71, 15.05, 15.05, 15.76, 15.25), 1)],
+              *[(f"diag_tire_p_{w}", w, p, "kPa", True) for w, p in (("fl", 253.4), ("fr", 250.0), ("rl", 251.7), ("rr", 253.4))],
+              *[(f"diag_tire_t_{w}", w, t, "C", True) for w, t in (("fl", 13.0), ("fr", 13.0), ("rl", 14.0), ("rr", 13.0))]]
+SCENARIOS["ecu_data"] = ("ECU data", True, False, False, DIAG_ITEMS, 0.9, True)  # steering (lateral only): the hug arrow can show
+
 # radar marker shapes on the same road: far (the recorded car at 69 m) and close (8 m, closing 3 m/s: orange, decimal distance)
 CLOSE = {"radar_distance": 8.0, "radar_rel_speed": -3.0, "lead_distance": 8.0, "lead": {"dRel": 8.0, "yRel": 0.13, "vRel": -3.0}}
 for _n, _style in enumerate(("bar", "brackets", "chevron")):
@@ -213,6 +231,10 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
     pages = (("road", layout._car_onroad_layout),) if len(scenario) > 9 else (("road", layout._car_onroad_layout), ("data", layout._car_data_layout))
     for page_name, page in pages:
       plan.append((scenario, idx, page_name, page))
+    if scenario[0] == "ECU data":  # each group panel of the car data page, scrolled to
+      for n in range(1, 6):
+        plan.append((scenario, idx, f"data_panel{n}", layout._car_data_layout))
+      plan.append((scenario, idx, "hug_arrow_left", layout._car_onroad_layout))  # the oil line next to the left hug arrow
     if scenario[0].startswith("lateral only, medium"):  # steering: the hug screen open, and the arrows with it closed
       plan.append((scenario, idx, "hug_open", layout._car_onroad_layout))
       plan.append((scenario, idx, "hug_arrow_left", layout._car_onroad_layout))
@@ -243,6 +265,11 @@ def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
         hug._state.touched(time.monotonic())
       else:
         hug._state.close()
+    if page_name.startswith("data_panel") and wait == 60:  # scroll_to is relative: once, after the page has laid out
+      data = layout._car_data_layout
+      n = int(page_name[-1]) - 1
+      if n < len(data._panel_rows):
+        data._scroller.scroll_to(data._panel_rows[n].rect.y - data._scroller.rect.y - data._pad)
     if wait % 10 == 0:  # the main layout scrolls back to the road view by itself, keep asking for the page
       layout._scroll_to(page)
     wait += 1

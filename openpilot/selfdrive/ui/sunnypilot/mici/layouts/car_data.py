@@ -13,9 +13,11 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app, TextAlignment, TextAlignmentVertical
+from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import Scroller
+from openpilot.selfdrive.ui.sunnypilot.mici.layouts.diag_panels import PREFIX as DIAG_PREFIX, build_panels
 
 CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goes back, used while the global timeout is on its default
 ONE_DECIMAL_KEYS: set[str] = set()  # keys shown with one decimal place, none: the odometer only counts whole units
@@ -140,6 +142,67 @@ def get_items(sm) -> list:
     return []
 
 
+GREEN = rl.Color(70, 210, 110, 255)
+RED = rl.Color(255, 90, 90, 255)
+
+
+class _PanelRow(Widget):
+  """One group of values read from the car's ECUs (diag_panels.py), a full screen of the page: a title, an optional big
+  line, then label / value pairs in two columns, or for the tyres a 2 x 2 grid laid out like the car."""
+
+  def __init__(self, width: float, height: float, pad: float, scale: float):
+    super().__init__()
+    self.set_rect(rl.Rectangle(0, 0, width, height))
+    self._pad = pad
+    self._scale = scale
+    self._panel = None
+    self._font = gui_app.font(FontWeight.MEDIUM)
+    self._bold = gui_app.font(FontWeight.BOLD)
+
+  def set_panel(self, panel) -> None:
+    self._panel = panel
+
+  def _text(self, text: str, x: float, y: float, size: float, color: rl.Color, bold: bool = False, right: float | None = None) -> None:
+    font = self._bold if bold else self._font
+    if right is not None:
+      x = right - measure_text_cached(font, text, int(size)).x
+    rl.draw_text_ex(font, text, rl.Vector2(round(x), round(y)), size, 0, color)  # whole pixels: no clipped last glyph
+
+  def _render(self, rect: rl.Rectangle) -> None:
+    p = self._panel
+    if p is None:
+      return
+    s, pad = self._scale, self._pad
+    tile = rl.Rectangle(rect.x + pad, rect.y, rect.width - 2 * pad, rect.height)
+    rl.draw_rectangle_rounded(tile, 0.09, 8, TILE_COLOR)
+    x, y, w = tile.x + pad * 1.2, tile.y + pad * 0.9, tile.width - pad * 2.4
+    self._text(p.title, x, y, 18 * s, LABEL_COLOR)
+    y += 24 * s
+    if p.big:
+      color = GREEN if p.state == "charging" else RED if p.state == "draining" else VALUE_COLOR
+      self._text(p.big, x, y, 32 * s, color, bold=True)
+      y += 40 * s
+    if p.grid:
+      cell_w, cell_h = (w - pad) / 2, (tile.y + tile.height - y - pad * 0.6) / 2
+      for i, (name, pressure, temp) in enumerate(p.grid):
+        cx, cy = x + (i % 2) * cell_w, y + (i // 2) * cell_h
+        # the temperature is the news (the dash shows the pressures): big and white, the pressure small beside it
+        self._text(name, cx, cy, 15 * s, LABEL_COLOR)
+        self._text(temp, cx, cy + 17 * s, 27 * s, VALUE_COLOR, bold=True)
+        self._text(pressure, cx + cell_w * 0.5, cy + 25 * s, 18 * s, LABEL_COLOR)
+      return
+    size = 19 * s
+    line = size * 1.42
+    gap = pad * 1.5  # between the two columns
+    right_edge = tile.x + tile.width - pad * 2.0  # values end here, clear of the rounded edge
+    col_w = (right_edge - x - gap) / 2
+    for i, (label, value) in enumerate(p.pairs):
+      cx, cy = x + (i % 2) * (col_w + gap), y + (i // 2) * line
+      self._text(label, cx, cy, size, LABEL_COLOR)
+      alone = i == len(p.pairs) - 1 and i % 2 == 0  # an odd last item has the whole row
+      self._text(value, cx, cy, size, VALUE_COLOR, bold=True, right=right_edge if alone else cx + col_w)
+
+
 class _TileRow(Widget):
   """A fixed size row with up to two tiles, the fonts do not shrink when there are many rows."""
 
@@ -198,6 +261,8 @@ class MiciCarDataLayout(Scroller):
     self._empty = UnifiedLabel("no car data available", int(30 * self._scale), FontWeight.MEDIUM, EMPTY_COLOR,
                                alignment=TextAlignment.CENTER, alignment_vertical=TextAlignmentVertical.MIDDLE)
     self._rows: list[_TileRow] = []
+    self._panel_rows: list[_PanelRow] = []
+    self._layout_key: tuple = ()
     self._label_cache: dict = {}
     self._has_items = False
     self._stored: list = []
@@ -216,18 +281,27 @@ class MiciCarDataLayout(Scroller):
     items = get_items(ui_state.sm) or self._stored_items()
     if (battery := voltage_item(ui_state.sm)) is not None:
       items = [*items, battery]
-    items = order_items(complete_items(items))
+    panels = build_panels(items)  # the values read from the ECUs, one full-screen panel per group after the tiles
+    items = order_items(complete_items([i for i in items if not i.key.startswith(DIAG_PREFIX)]))
     self._has_items = bool(items)
 
     rows = rows_of(items)
     while len(self._rows) < len(rows):
-      row = _TileRow(self._width, self._tile_height, self._pad, self._scale, self._label_cache)
-      self._rows.append(row)
-      self._scroller.add_widget(row)
-    while len(self._rows) > len(rows):
-      self._scroller.items.remove(self._rows.pop())
+      self._rows.append(_TileRow(self._width, self._tile_height, self._pad, self._scale, self._label_cache))
+    del self._rows[len(rows):]
+    while len(self._panel_rows) < len(panels):
+      self._panel_rows.append(_PanelRow(self._width, self._tile_height * 2 + self._pad, self._pad, self._scale))
+    del self._panel_rows[len(panels):]
+    layout_key = (len(rows), len(panels))
+    if layout_key != self._layout_key:  # rebuild the scroller only when the number of rows or panels changes
+      self._layout_key = layout_key
+      self._scroller.items.clear()
+      for widget in (*self._rows, *self._panel_rows):
+        self._scroller.add_widget(widget)
     for row, chunk in zip(self._rows, rows, strict=True):
       row.set_items(chunk)
+    for row, panel in zip(self._panel_rows, panels, strict=True):
+      row.set_panel(panel)
 
   def _render(self, rect: rl.Rectangle) -> None:
     rl.draw_rectangle_rec(rect, rl.BLACK)
