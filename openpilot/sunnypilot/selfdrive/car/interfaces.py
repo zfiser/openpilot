@@ -127,6 +127,7 @@ def initialize_params(params) -> list[dict[str, Any]]:
     "ToyotaEnforceStockLongitudinal",
     "ToyotaStopAndGoHack",
     "ToyotaTSS2Smooth",
+    "ToyotaEcuData",  # fork: ECU data reader + panda ECU_DATA flag (opendbc sunnypilot/car/toyota/ecu_data.py)
   ])
 
   return [{k: params.get(k, return_default=True)} for k in keys]

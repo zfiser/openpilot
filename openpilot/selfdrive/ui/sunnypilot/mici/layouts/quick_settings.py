@@ -126,6 +126,7 @@ def driving_screen_panel() -> SettingsPanel:
     BigBoolParam("lead\ndistance", "ShowLeadDistance"),
     BigBoolParam("brake dot", "ShowBrakeDot"),
     BigBoolParam("radar\nmarker", "ShowRadarDot"),  # brackets around the car the radar has as its lead (radar_dot.py)
+    BigBoolParam("ecu data", "ToyotaEcuData"),  # oil, tyres, batteries ... read once a minute; applies at the next car start
     BigBoolParam("engine rpm", "ShowRpm"),
     BigBoolParam("closing\nwarning", "ClosingWarning"),
     BigBoolParam("new car\nahead", "ClosingWarningAppear"),  # the closing warning's chime for a car that appears ahead
