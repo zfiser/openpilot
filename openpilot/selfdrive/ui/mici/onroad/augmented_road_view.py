@@ -127,6 +127,8 @@ class AugmentedRoadView(CameraView):
 
     # Render the base camera view
     super()._render(self._content_rect)
+    if getattr(ui_state, "_demo_on", False):  # fork, demo build: no video, set the road projection the camera frames would
+      self._calc_frame_matrix(self._content_rect)
 
     # Draw all UI overlays
     self._model_renderer.render(self._content_rect)
