@@ -15,7 +15,7 @@ import random
 
 from openpilot.cereal import custom, log, messaging
 
-DEMO = False  # the demo build (branch mici-sidebar-car-data-demo) sets this to True
+DEMO = True  # the demo build (branch mici-sidebar-car-data-demo); the main branch has False
 
 ROAD = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo_road.json")))  # a real road of 16 Nov
 

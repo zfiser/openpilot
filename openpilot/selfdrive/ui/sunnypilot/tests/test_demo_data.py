@@ -9,7 +9,7 @@ from openpilot.selfdrive.ui.sunnypilot import demo_data as dd
 
 class TestDemoData:
   def test_off_in_the_normal_build(self):
-    assert dd.DEMO is False  # the demo branch flips it; main must never ship it on
+    assert dd.DEMO is True  # this is the demo branch
 
   def test_every_situation_builds_its_messages(self):
     names = set()
