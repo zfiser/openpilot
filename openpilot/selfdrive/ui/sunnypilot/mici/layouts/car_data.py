@@ -148,11 +148,13 @@ RED = rl.Color(255, 90, 90, 255)
 
 PAIR_SIZE = 24  # font size of the label / value lines of a panel (at the 240 px reference height)
 PAIR_LINE = 1.42  # line height in font sizes
-TWO_COLUMN_LABEL = 10  # characters: panels whose labels are all this short keep two columns (hybrid battery sensors)
+TWO_COLUMN_LABEL = 10  # characters: panels whose labels and values are all this short keep two columns (hybrid battery)
+TWO_COLUMN_VALUE = 8  # e.g. "15.4 °C"; the compressor's "1,500 / 1,500 rpm" needs a line of its own
 
 
 def _columns(panel) -> int:
-  return 2 if all(len(label) <= TWO_COLUMN_LABEL for label, _ in panel.pairs) else 1
+  short = all(len(label) <= TWO_COLUMN_LABEL and len(value) <= TWO_COLUMN_VALUE for label, value in panel.pairs)
+  return 2 if short else 1
 
 
 class _PanelRow(Widget):
