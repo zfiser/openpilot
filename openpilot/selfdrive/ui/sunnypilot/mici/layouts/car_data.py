@@ -146,6 +146,15 @@ GREEN = rl.Color(70, 210, 110, 255)
 RED = rl.Color(255, 90, 90, 255)
 
 
+PAIR_SIZE = 24  # font size of the label / value lines of a panel (at the 240 px reference height)
+PAIR_LINE = 1.42  # line height in font sizes
+TWO_COLUMN_LABEL = 10  # characters: panels whose labels are all this short keep two columns (hybrid battery sensors)
+
+
+def _columns(panel) -> int:
+  return 2 if all(len(label) <= TWO_COLUMN_LABEL for label, _ in panel.pairs) else 1
+
+
 class _PanelRow(Widget):
   """One group of values read from the car's ECUs (diag_panels.py), a full screen of the page: a title, an optional big
   line, then label / value pairs in two columns, or for the tyres a 2 x 2 grid laid out like the car."""
@@ -153,6 +162,7 @@ class _PanelRow(Widget):
   def __init__(self, width: float, height: float, pad: float, scale: float):
     super().__init__()
     self.set_rect(rl.Rectangle(0, 0, width, height))
+    self._min_height = height
     self._pad = pad
     self._scale = scale
     self._panel = None
@@ -161,11 +171,19 @@ class _PanelRow(Widget):
 
   def set_panel(self, panel) -> None:
     self._panel = panel
+    # the panel grows with its content (one column for long labels), at least the size of two tile rows
+    s, pad = self._scale, self._pad
+    content = pad * 0.9 + 28 * s + (40 * s if panel.big else 0.0) + pad * 1.2
+    if panel.pairs and not panel.grid:
+      rows = len(panel.pairs) if _columns(panel) == 1 else (len(panel.pairs) + 1) // 2
+      content += rows * PAIR_SIZE * PAIR_LINE * s
+    self.set_rect(rl.Rectangle(self._rect.x, self._rect.y, self._rect.width, max(self._min_height, content)))
 
   def _text(self, text: str, x: float, y: float, size: float, color: rl.Color, bold: bool = False, right: float | None = None) -> None:
     font = self._bold if bold else self._font
+    size = int(size)  # measured and drawn at the same size, else a right-aligned value loses its last glyph
     if right is not None:
-      x = right - measure_text_cached(font, text, int(size)).x
+      x = right - measure_text_cached(font, text, size).x
     rl.draw_text_ex(font, text, rl.Vector2(round(x), round(y)), size, 0, color)  # whole pixels: no clipped last glyph
 
   def _render(self, rect: rl.Rectangle) -> None:
@@ -176,8 +194,8 @@ class _PanelRow(Widget):
     tile = rl.Rectangle(rect.x + pad, rect.y, rect.width - 2 * pad, rect.height)
     rl.draw_rectangle_rounded(tile, 0.09, 8, TILE_COLOR)
     x, y, w = tile.x + pad * 1.2, tile.y + pad * 0.9, tile.width - pad * 2.4
-    self._text(p.title, x, y, 18 * s, LABEL_COLOR)
-    y += 24 * s
+    self._text(p.title, x, y, 22 * s, LABEL_COLOR)
+    y += 28 * s
     if p.big:
       color = GREEN if p.state == "charging" else RED if p.state == "draining" else VALUE_COLOR
       self._text(p.big, x, y, 32 * s, color, bold=True)
@@ -187,19 +205,20 @@ class _PanelRow(Widget):
       for i, (name, pressure, temp) in enumerate(p.grid):
         cx, cy = x + (i % 2) * cell_w, y + (i // 2) * cell_h
         # the temperature is the news (the dash shows the pressures): big and white, the pressure small beside it
-        self._text(name, cx, cy, 15 * s, LABEL_COLOR)
-        self._text(temp, cx, cy + 17 * s, 27 * s, VALUE_COLOR, bold=True)
-        self._text(pressure, cx + cell_w * 0.5, cy + 25 * s, 18 * s, LABEL_COLOR)
+        self._text(name, cx, cy, 20 * s, LABEL_COLOR)
+        self._text(temp, cx, cy + 22 * s, 30 * s, VALUE_COLOR, bold=True)
+        self._text(pressure, cx + cell_w * 0.5, cy + 28 * s, 22 * s, LABEL_COLOR)
       return
-    size = 19 * s
-    line = size * 1.42
+    size = PAIR_SIZE * s
+    line = size * PAIR_LINE
     gap = pad * 1.5  # between the two columns
     right_edge = tile.x + tile.width - pad * 2.0  # values end here, clear of the rounded edge
-    col_w = (right_edge - x - gap) / 2
+    columns = _columns(p)
+    col_w = (right_edge - x - gap * (columns - 1)) / columns
     for i, (label, value) in enumerate(p.pairs):
-      cx, cy = x + (i % 2) * (col_w + gap), y + (i // 2) * line
+      cx, cy = x + (i % columns) * (col_w + gap), y + (i // columns) * line
       self._text(label, cx, cy, size, LABEL_COLOR)
-      alone = i == len(p.pairs) - 1 and i % 2 == 0  # an odd last item has the whole row
+      alone = i == len(p.pairs) - 1 and i % columns == 0  # an odd last item has the whole row
       self._text(value, cx, cy, size, VALUE_COLOR, bold=True, right=right_edge if alone else cx + col_w)
 
 
@@ -210,7 +229,7 @@ class _TileRow(Widget):
     super().__init__()
     self.set_rect(rl.Rectangle(0, 0, width, height))
     self._pad = pad
-    self._label_size = int(18 * scale)
+    self._label_size = int(22 * scale)
     self._value_size = int(35 * scale)
     self._cache = label_cache
     self._items: list = []
