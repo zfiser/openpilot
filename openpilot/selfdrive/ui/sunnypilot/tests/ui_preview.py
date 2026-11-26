@@ -15,16 +15,15 @@ The values animate (lead distance, confidence, steering, driver head, car data).
 Add --shots DIR to render every scenario headless and save PNGs of the road view and the car data page.
 """
 import argparse
-import json
-import math
 import os
 import time
 
 import pyray as rl
 
-from openpilot.cereal import custom, log, messaging
+from openpilot.cereal import log, messaging
 from openpilot.cereal.messaging import PubMaster
 from openpilot.common.prefix import OpenpilotPrefix
+from openpilot.selfdrive.ui.sunnypilot.demo_data import DIAG_ITEMS, ROAD, animate_item, build_state  # noqa: F401
 
 # name -> (lead car, planner stop, openpilot state enabled, car data items as (key, label, value, unit, valid))
 SCENARIOS = {
@@ -57,22 +56,6 @@ SCENARIOS = {
                             None, "road"),
 }
 
-# the values read from the ECUs (diag_*), as answered by the car on 24 Nov (analysis 2026-11-23_diag, probe 1 and 2)
-DIAG_ITEMS = [("rpm", "Engine RPM", 1850.0, "rpm", True), ("engine_temp", "Engine temp", 17.0, "C", True),
-              ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True),
-              ("diag_oil_temp", "Oil", 18.0, "C", True), ("diag_coolant", "Coolant", 17.5, "C", True),
-              ("diag_transaxle_oil", "Transaxle oil", 17.0, "C", True), ("diag_mg_inverter", "Motor inverter", 15.0, "C", True),
-              ("diag_gen_inverter", "Generator inverter", 14.0, "C", True), ("diag_inverter_coolant", "Inverter coolant", 19.0, "C", True),
-              ("diag_rear_inverter_coolant", "Rear inverter coolant", 12.0, "C", True), ("diag_boost_upper", "Boost upper", 17.0, "C", True),
-              ("diag_boost_lower", "Boost lower", 17.0, "C", True), ("diag_cabin", "Cabin", 16.0, "C", True),
-              ("diag_compressor", "Compressor", 0.0, "rpm", True), ("diag_compressor_target", "Compressor target", 0.0, "rpm", True),
-              ("diag_ac_power", "A/C power", 0.0, "kW", True), ("diag_12v_v", "12V", 14.48, "V", True),
-              ("diag_12v_a", "12V current", 5.87, "A", True), ("diag_12v_temp", "12V temp", 11.9, "C", True),
-              ("diag_12v_smooth", "12V smoothed", 14.14, "V", True), ("diag_12v_relay", "12V before relay", 11.29, "V", True),
-              ("diag_aux_v", "Aux", 14.38, "V", True), ("diag_12v_km", "Since disconnect", 3124.0, "km", True),
-              *[(f"diag_hv_temp{i}", f"HV {i}", t, "C", True) for i, t in enumerate((15.35, 15.71, 15.05, 15.05, 15.76, 15.25), 1)],
-              *[(f"diag_tire_p_{w}", w, p, "kPa", True) for w, p in (("fl", 253.4), ("fr", 250.0), ("rl", 251.7), ("rr", 253.4))],
-              *[(f"diag_tire_t_{w}", w, t, "C", True) for w, t in (("fl", 13.0), ("fr", 13.0), ("rl", 14.0), ("rr", 13.0))]]
 SCENARIOS["ecu_data"] = ("ECU data", True, False, False, DIAG_ITEMS, 0.9, True)  # steering (lateral only): the hug arrow can show
 
 # radar marker shapes on the same road: far (the recorded car at 69 m) and close (8 m, closing 3 m/s: orange, decimal distance)
@@ -82,18 +65,6 @@ for _n, _style in enumerate(("bar", "brackets", "chevron")):
     SCENARIOS[f"marker_{_style}_{_label}"] = (f"radar marker {_style}, {_label}", False, False, False,
                                               [("odometer", "Odometer", 54321.0, "km", True)], 0.9, True, None, "road", _style, _over)
 
-ROAD = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_preview_road.json")))  # see KEY_NINE
-
-
-def animate_item(item, t: float):
-  """Make the fake car data move a little so the page looks alive, odometer counts up, the rest wobbles."""
-  key, label, value, unit, valid = item
-  if key == "rpm" and value == 0.0:
-    return item  # engine off stays off
-  wobble = {"odometer": 0.0, "rpm": 600.0 * math.sin(t * 0.8),
-            "hv": 3.0 * math.sin(t * 0.2), "lead_distance": 8.0 * math.sin(t * 0.6),  # gap shrinks and grows, shows both trend colours
-            "tire_pressure_guess": 1.5 * math.sin(t * 0.2), "tire_temperature_guess": 1.0 * math.sin(t * 0.15)}.get(key, 0.0)
-  return key, label, value + wobble + (t * 0.01 if key == "odometer" else 0.0), unit, valid
 
 
 NETWORKS = [("wifi", log.DeviceState.NetworkType.wifi), ("LTE", log.DeviceState.NetworkType.cell4G),
@@ -101,123 +72,48 @@ NETWORKS = [("wifi", log.DeviceState.NetworkType.wifi), ("LTE", log.DeviceState.
 
 
 def send_state(pm: PubMaster, scenario, t: float | None = None, network_type=log.DeviceState.NetworkType.wifi) -> None:
-  """t is seconds since start for animated values, None gives fixed values (used for the screenshots)."""
-  _, lead, stop, enabled, items, *extra = scenario
-  fixed_confidence = extra[0] if extra else None
-  lat_only = bool(extra[1]) if len(extra) > 1 else False
-  alert_text = extra[2] if len(extra) > 2 else None  # a message that covers the top of the road view
-  road = len(extra) > 3 and extra[3] == "road"  # the recorded road of ui_preview_road.json
-  R = dict(ROAD, **extra[5]) if len(extra) > 5 and extra[5] else ROAD  # a road scene with other radar / lead values
-  if road:
-    items = list(items) + [("lead_distance", "Lead distance", R["lead_distance"], "m", True),
-                           ("radar_distance", "Radar distance", R["radar_distance"], "m", True),
-                           ("radar_rel_speed", "Radar rel speed", R["radar_rel_speed"], "m/s", True)]
-  moving = (enabled or lat_only) and not stop
-  if t is not None:
-    items = [animate_item(item, t) for item in items]
-  lead_distance = 32.4 if t is None else 32.0 + 18.0 * math.sin(t * 0.5)
-  confidence = fixed_confidence if fixed_confidence is not None else (0.9 if t is None else 0.5 + 0.5 * math.sin(t * 0.3))  # sweeps green, orange, red
-  steering_angle = 0.0 if t is None else 25.0 * math.sin(t * 0.4)
-  head_yaw = 0.0 if t is None else 0.6 * math.sin(t * 0.6)  # driver looks around, radians
-  head_pitch = 0.0 if t is None else 0.25 * math.sin(t * 0.9)
+  for msg in build_state(scenario, t, network_type):
+    pm.send(msg.which(), msg)
 
-  ds = messaging.new_message('deviceState')
-  ds.deviceState.started = True
-  ds.deviceState.networkType = network_type
-  ds.deviceState.networkStrength = log.DeviceState.NetworkStrength.good
-  ps = messaging.new_message('pandaStates', 1)
-  ps.pandaStates[0].pandaType = log.PandaState.PandaType.dos
-  ps.pandaStates[0].ignitionLine = True
-  pm.send('deviceState', ds)
-  pm.send('pandaStates', ps)
 
-  periph = messaging.new_message('peripheralState')
-  periph.peripheralState.pandaType = log.PandaState.PandaType.dos
-  periph.peripheralState.voltage = int((12640 if t is None else 12700 + 600 * math.sin(t * 0.3)))  # millivolts
-  pm.send('peripheralState', periph)
+def demo_shots(out_dir: str, layout, ui_state) -> None:
+  """The demo build: nothing published, ui_state makes up the data. One road view per situation (mid situation), then the
+  car data page and its panels."""
+  from openpilot.system.ui.lib.application import gui_app
+  from openpilot.selfdrive.ui.sunnypilot import demo_data
 
-  ss = messaging.new_message('selfdriveState')
-  ss.selfdriveState.enabled = enabled
-  ss.selfdriveState.active = enabled
-  ss.selfdriveState.state = log.SelfdriveState.OpenpilotState.enabled if enabled else log.SelfdriveState.OpenpilotState.disabled
-  if alert_text:
-    ss.selfdriveState.alertText1 = alert_text
-    ss.selfdriveState.alertSize = log.SelfdriveState.AlertSize.mid
-    ss.selfdriveState.alertStatus = log.SelfdriveState.AlertStatus.userPrompt
-  pm.send('selfdriveState', ss)
-
-  ssp = messaging.new_message('selfdriveStateSP')
-  mads = ssp.selfdriveStateSP.mads
-  mads.available = True
-  mads.enabled = lat_only
-  mads.active = lat_only
-  mads.state = (custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState.enabled if lat_only
-                else custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState.disabled)
-  pm.send('selfdriveStateSP', ssp)
-
-  rs = messaging.new_message('radarState')
-  rs.radarState.leadOne.present = lead or road
-  rs.radarState.leadOne.dRel = R["lead"]["dRel"] if road else lead_distance
-  if road:
-    rs.radarState.leadOne.yRel = R["lead"]["yRel"]
-    rs.radarState.leadOne.vRel = R["lead"]["vRel"]
-  pm.send('radarState', rs)
-
-  gps = messaging.new_message('gpsLocationExternal')
-  gps.gpsLocationExternal.hasFix = True
-  gps.gpsLocationExternal.speed = (25.0 if moving else 0.0) + (0.0 if t is None else 3.0 * math.sin(t * 0.5))
-  pm.send('gpsLocationExternal', gps)
-
-  car = messaging.new_message('carState')
-  car.carState.vEgo = ROAD["vEgo"] if road else (20.0 if moving else 0.0)
-  car.carState.standstill = not moving
-  car.carState.steeringAngleDeg = steering_angle
-  car.carState.cruiseState.available = True
-  car.carState.cruiseState.enabled = enabled
-  car.carState.cruiseState.speed = 27.0
-  pm.send('carState', car)
-
-  mv = messaging.new_message('modelV2')
-  # lateral only looks at the steering override probability, fully engaged at the product of both
-  mv.modelV2.meta.disengagePredictions.brakeDisengageProbs = [0.0 if lat_only else 1.0 - confidence]
-  mv.modelV2.meta.disengagePredictions.steerOverrideProbs = [1.0 - confidence if lat_only else 0.0]
-  if road:
-    for k in "xyz":
-      setattr(mv.modelV2.position, k, ROAD["position"][k])
-    lanes = mv.modelV2.init("laneLines", len(ROAD["laneLines"]))
-    for out, line in zip(lanes, ROAD["laneLines"], strict=True):
-      out.x, out.y, out.z = line["x"], line["y"], line["z"]
-    mv.modelV2.laneLineProbs = ROAD["laneLineProbs"]
-    mv.modelV2.roadEdgeStds = [0.4, 0.4]  # not in the fixture; any confident value
-    edges = mv.modelV2.init("roadEdges", len(ROAD["roadEdges"]))
-    for out, line in zip(edges, ROAD["roadEdges"], strict=True):
-      out.x, out.y, out.z = line["x"], line["y"], line["z"]
-  pm.send('modelV2', mv)
-
-  cal = messaging.new_message('extrinsicsCalibration')
-  cal.extrinsicsCalibration.rpyCalib = ROAD["rpyCalib"] if road else [0.0, 0.0, 0.0]
-  cal.extrinsicsCalibration.height = ROAD["height"]
-  cal.extrinsicsCalibration.calStatus = log.ExtrinsicsCalibration.Status.calibrated
-  pm.send('extrinsicsCalibration', cal)
-
-  dm = messaging.new_message('driverMonitoringState')
-  dm.driverMonitoringState.activePolicy = log.DriverMonitoringState.MonitoringPolicy.vision
-  dm.driverMonitoringState.visionPolicyState.faceDetected = True
-  dm.driverMonitoringState.visionPolicyState.awarenessPercent = 100.0
-  dm.driverMonitoringState.visionPolicyState.pose.yaw = head_yaw
-  dm.driverMonitoringState.visionPolicyState.pose.pitch = head_pitch
-  pm.send('driverMonitoringState', dm)
-  pm.send('driverStateV2', messaging.new_message('driverStateV2'))
-
-  lp = messaging.new_message('longitudinalPlan')
-  lp.longitudinalPlan.shouldStop = stop
-  pm.send('longitudinalPlan', lp)
-
-  cs = messaging.new_message('carStateSP')
-  data = cs.carStateSP.init('carData', len(items))
-  for out, (key, label, value, unit, valid) in zip(data, items, strict=True):
-    out.key, out.label, out.value, out.unit, out.valid = key, label, value, unit, valid
-  pm.send('carStateSP', cs)
+  os.makedirs(out_dir, exist_ok=True)
+  gui_app.set_show_touches(False)  # the developer touch outlines, off on the car unless ShowDebugInfo is set
+  gui_app.set_show_fps(False)
+  start = time.monotonic()
+  plan = [(demo_data.SITUATION_SECONDS * (n + 0.5), f"demo_{n + 1}_road", layout._car_onroad_layout) for n in range(5)]
+  plan += [(demo_data.SITUATION_SECONDS * 5 + 2, "demo_data", layout._car_data_layout)]
+  plan += [(demo_data.SITUATION_SECONDS * 5 + 4 + 2 * n, f"demo_panel{n + 1}", layout._car_data_layout) for n in range(5)]
+  step = 0
+  scrolled = False
+  for _ in gui_app.render():
+    ui_state.update()
+    t = time.monotonic() - start
+    when, name, page = plan[step]
+    road_view = layout._car_onroad_layout
+    if road_view._content_rect.width > 0:
+      road_view._calc_frame_matrix(road_view._content_rect)  # no video: set the road projection the camera view would
+    layout._scroll_to(page)
+    if name.startswith("demo_panel") and not scrolled and t > when - 1.0:
+      data = layout._car_data_layout
+      n = int(name[-1]) - 1
+      if n < len(data._panel_rows):
+        data._scroller.scroll_to(data._panel_rows[n].rect.y - data._scroller.rect.y - data._pad)
+      scrolled = True
+    if t >= when:
+      image = rl.load_image_from_screen()
+      rl.export_image(image, os.path.join(out_dir, f"{name}.png"))
+      rl.unload_image(image)
+      print("saved", name, "-", demo_data.demo_situation(t)[0], "| demo on:", ui_state._demo_on, "| started:", ui_state.started)
+      step += 1
+      scrolled = False
+      if step >= len(plan):
+        break
 
 
 def save_shots(out_dir: str, layout, pm: PubMaster, ui_state) -> None:
@@ -290,9 +186,15 @@ def main() -> None:
   parser = argparse.ArgumentParser()
   parser.add_argument("--shots", metavar="DIR", help="render all scenarios headless and save PNGs")
   parser.add_argument("--metric", action="store_true", help="start with the metric unit setting on (distances in m, not ft)")
+  parser.add_argument("--demo", metavar="DIR", help="run the demo build (demo_data.DEMO) headless for 100 s, a screenshot per situation")
   args = parser.parse_args()
 
-  if args.shots:
+  if args.demo:
+    from openpilot.selfdrive.ui.sunnypilot import demo_data
+    demo_data.DEMO = True  # before ui_state is created
+    args.shots = None
+
+  if args.shots or args.demo:
     rl.set_config_flags(rl.ConfigFlags.FLAG_WINDOW_HIDDEN)
     os.environ["OFFSCREEN"] = "1"
 
@@ -320,6 +222,10 @@ def main() -> None:
 
     if args.shots:
       save_shots(args.shots, layout, pm, ui_state)
+      gui_app.close()
+      return
+    if args.demo:
+      demo_shots(args.demo, layout, ui_state)
       gui_app.close()
       return
 

@@ -17,6 +17,7 @@ from openpilot.selfdrive.modeld.helpers import chestnut_compiled
 from openpilot.selfdrive.selfdrived.alertmanager import OFFROAD_ALERTS
 
 from openpilot.selfdrive.ui.sunnypilot.ui_state import UIStateSP, DeviceSP
+from openpilot.selfdrive.ui.sunnypilot import demo_data
 
 BACKLIGHT_OFFROAD = 65 if HARDWARE.get_device_type() == "mici" else 50
 PARAM_UPDATE_TIME = 1 / 5.0
@@ -107,6 +108,8 @@ class UIState(UIStateSP):
     self.usb_unknown: bool = False
     self.chestnut_state = ChestnutState.DISCONNECTED
     self.started: bool = False
+    self._demo_on = demo_data.DEMO  # fork: the demo build, ended for good by real ignition (demo_data.py)
+    self._demo_start = time.monotonic()
     self.ignition: bool = False
     self.recording_audio: bool = False
     self.panda_type: log.PandaState.PandaType = log.PandaState.PandaType.unknown
@@ -148,12 +151,35 @@ class UIState(UIStateSP):
       self._params_thread = threading.Thread(target=self._params_refresh_worker, daemon=True)
       self._params_thread.start()
 
-    self.sm.update(0)
+    if self._demo_on:
+      self._demo_update()
+    else:
+      self.sm.update(0)
     self._update_state()
     self._update_status()
     self._update_chestnut_state()
     device.update()
     UIStateSP.update(self)
+
+  def _demo_update(self) -> None:
+    """fork, demo build: the real messages, with the demo's instead of the topics it fakes. Real ignition ends the demo."""
+    try:
+      msgs = [messaging.recv_one_or_none(sock) for sock in self.sm.poller.poll(0)]
+      msgs += [messaging.recv_one_or_none(self.sm.sock[s]) for s in self.sm.non_polled_services]
+      msgs = [m for m in msgs if m is not None]
+      for m in msgs:
+        if m.which() == "pandaStates" and any(ps.ignitionLine or ps.ignitionCan for ps in m.pandaStates):
+          self._demo_on = False
+          cloudlog.warning("demo build: real ignition, the demo ends until the next boot")
+      if self._demo_on:
+        fake = demo_data.demo_messages(time.monotonic() - self._demo_start)
+        faked = {m.which() for m in fake}
+        msgs = [m for m in msgs if m.which() not in faked] + fake
+      self.sm.update_msgs(time.monotonic(), msgs)
+    except Exception:
+      cloudlog.exception("demo build failed, back to real data")
+      self._demo_on = False
+      self.sm.update(0)
 
   def _params_refresh_worker(self):
     drop_realtime()
