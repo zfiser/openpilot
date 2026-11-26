@@ -82,6 +82,27 @@ class TestClosingWarning:
     run(cw, 1.5, present=False, look=True)
     assert run(cw, 0.05, d=25.0, closing=0.0, look=True) == [APPEARED]
 
+  def test_far_car_that_flickers_at_first_still_chimes(self):
+    # review 26 Nov: a real far car the radar loses for a moment during the hold was dropped for good
+    cw = ClosingWarning()
+    run(cw, 1.5, present=False, look=True)
+    assert run(cw, 0.4, d=90.0, closing=8.0, look=True) == []
+    assert run(cw, 0.3, present=False, look=True) == []  # a short dropout
+    assert run(cw, 0.29, d=84.0, closing=8.0, look=True) == []  # seen 0.69 s in all
+    assert run(cw, 0.1, d=82.0, closing=8.0, look=True) == [APPEARED]
+    # gone for a second or more: the old appearance is over, coming back at about the same distance is the same car
+    cw = ClosingWarning()
+    run(cw, 1.5, present=False, look=True)
+    run(cw, 0.4, d=90.0, closing=0.0, look=True)
+    run(cw, 1.2, present=False, look=True)
+    assert run(cw, 2.0, d=90.0, closing=0.0, look=True) == []
+    # a blip, a pause and then braking: nothing
+    cw = ClosingWarning()
+    run(cw, 1.5, present=False, look=True)
+    run(cw, 0.4, d=90.0, closing=0.0, look=True)
+    run(cw, 0.3, present=False, look=True, brake=True)
+    assert run(cw, 2.0, d=90.0, closing=0.0, look=True) == []
+
   def test_far_car_glance_before_it_appeared_still_counts(self):
     cw = ClosingWarning()
     run(cw, 1.5, present=False)
