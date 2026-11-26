@@ -209,7 +209,7 @@ class _PanelRow(Widget):
         # the temperature is the news (the dash shows the pressures): big and white, the pressure small beside it
         self._text(name, cx, cy, 20 * s, LABEL_COLOR)
         self._text(temp, cx, cy + 22 * s, 30 * s, VALUE_COLOR, bold=True)
-        self._text(pressure, cx + cell_w * 0.5, cy + 28 * s, 22 * s, LABEL_COLOR)
+        self._text(pressure, cx + cell_w * 0.48, cy + 25 * s, 26 * s, LABEL_COLOR)
       return
     size = PAIR_SIZE * s
     line = size * PAIR_LINE
