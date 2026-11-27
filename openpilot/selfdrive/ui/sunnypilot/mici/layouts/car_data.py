@@ -23,10 +23,11 @@ CAR_DATA_TIMEOUT = 15  # seconds without touching the page before the screen goe
 ONE_DECIMAL_KEYS: set[str] = set()  # keys shown with one decimal place, none: the odometer only counts whole units
 # The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
 # there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
-STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("rpm", "Engine RPM", "rpm"),
+STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("cabin", "Cabin", "C"),
                   ("engine_temp", "Engine temp", "C"), ("drive_time", "Time", "s"), ("odometer", "Odometer", "km"))
 DURATION_KEYS = {"drive_time"}  # seconds, shown as h:mm
-HIDDEN_KEYS = {"lead_distance", "friction_brake_force", "radar_distance", "radar_rel_speed"}  # driving screen / warnings only
+HIDDEN_KEYS = {"lead_distance", "friction_brake_force", "radar_distance", "radar_rel_speed", "rpm"}  # driving screen / warnings only
+CABIN_SOURCE = "diag_cabin"  # the cabin tile shows the climate ECU's cabin temperature (read once a minute, ECU data)
 LAST_USEFUL_KEY = "odometer"  # after everything else that is useful, before the experimental tiles
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
 COLUMNS = 2  # tiles per row, the tile size is fixed and the page scrolls when there are more rows than fit
@@ -325,6 +326,9 @@ class MiciCarDataLayout(Scroller):
     if (battery := voltage_item(ui_state.sm)) is not None:
       items = [*items, battery]
     panels = build_panels(items)  # the values read from the ECUs, one full-screen panel per group after the tiles
+    cabin = next((i for i in items if i.key == CABIN_SOURCE), None)
+    if cabin is not None:
+      items = [*items, SimpleNamespace(key="cabin", label="Cabin", value=cabin.value, unit="C", valid=cabin.valid)]
     items = order_items(complete_items([i for i in items if not i.key.startswith(DIAG_PREFIX)]))
     self._has_items = bool(items)
 

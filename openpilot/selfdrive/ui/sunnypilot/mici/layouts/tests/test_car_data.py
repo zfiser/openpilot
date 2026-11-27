@@ -142,13 +142,13 @@ class TestCarData(unittest.TestCase):
 
   def test_today_and_battery_lead_the_first_row(self):
     keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
-    items = [_Obj(key=k) for k in ("odometer", "rpm", "battery_12v", "today", "extra")]
-    assert keys(items) == ["today", "battery_12v", "rpm", "extra", "odometer"]
+    items = [_Obj(key=k) for k in ("odometer", "cabin", "battery_12v", "today", "extra")]
+    assert keys(items) == ["today", "battery_12v", "cabin", "extra", "odometer"]
 
   def test_order_with_missing_items(self):
     keys = lambda items: [i.key for i in self.mod.order_items(items)]  # noqa: E731
     assert keys([_Obj(key="odometer"), _Obj(key="battery_12v")]) == ["battery_12v", "odometer"]
-    assert keys([_Obj(key="odometer"), _Obj(key="rpm")]) == ["rpm", "odometer"]
+    assert keys([_Obj(key="odometer"), _Obj(key="cabin")]) == ["cabin", "odometer"]
     assert keys([_Obj(key="odometer"), _Obj(key="today")]) == ["today", "odometer"]
     assert keys([]) == []
 
@@ -169,21 +169,22 @@ class TestCarData(unittest.TestCase):
     assert not any(i.valid for i in items)
 
   def test_complete_keeps_real_items_and_only_adds_the_missing_ones(self):
-    real = _Obj(key="rpm", label="Engine RPM", value=1800.0, unit="rpm", valid=True)
+    real = _Obj(key="cabin", label="Cabin", value=21.0, unit="C", valid=True)
     items = self.mod.complete_items([real])
     assert items[0] is real and len(items) == len(self.mod.STANDARD_TILES)
-    assert sum(i.key == "rpm" for i in items) == 1
+    assert sum(i.key == "cabin" for i in items) == 1
 
   def test_standard_order_and_experimental_tiles_last(self):
-    keys = ["watch_3", "tire_pressure_guess", "extra", "engine_temp", "rpm", "odometer", "battery_12v", "today", "watch_1"]
+    keys = ["watch_3", "tire_pressure_guess", "extra", "engine_temp", "cabin", "odometer", "battery_12v", "today", "watch_1"]
     ordered = [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])]
-    assert ordered == ["today", "battery_12v", "rpm", "engine_temp", "extra", "odometer", "watch_3", "tire_pressure_guess", "watch_1"]
+    assert ordered == ["today", "battery_12v", "cabin", "engine_temp", "extra", "odometer", "watch_3", "tire_pressure_guess", "watch_1"]
 
   def test_lead_distance_and_friction_brake_stay_off_the_page(self):
     sm = _SM([_Obj(key="lead_distance", label="Lead distance", value=23.0, unit="m", valid=True),
               _Obj(key="friction_brake_force", label="Friction brake", value=400.0, unit="N", valid=True),
-              _Obj(key="rpm", label="Engine RPM", value=1800.0, unit="rpm", valid=True)])
-    assert [i.key for i in self.mod.get_items(sm)] == ["rpm"]
+              _Obj(key="rpm", label="Engine RPM", value=1800.0, unit="rpm", valid=True),  # on the driving screen only
+              _Obj(key="engine_temp", label="Engine temp", value=80.0, unit="C", valid=True)])
+    assert [i.key for i in self.mod.get_items(sm)] == ["engine_temp"]
     assert not {"lead_distance", "friction_brake_force"} & {key for key, _, _ in self.mod.STANDARD_TILES}
 
   def test_duration_format(self):
@@ -202,8 +203,8 @@ class TestCarData(unittest.TestCase):
     assert {i.key: i for i in self.mod.stored_items(old, "2026-10-08")}["drive_time"].value == 0.0
 
   def test_time_tile_comes_after_the_engine_temperature(self):
-    keys = ["odometer", "drive_time", "engine_temp", "rpm", "battery_12v", "today"]
-    assert [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])] ==       ["today", "battery_12v", "rpm", "engine_temp", "drive_time", "odometer"]
+    keys = ["odometer", "drive_time", "engine_temp", "cabin", "battery_12v", "today"]
+    assert [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])] ==       ["today", "battery_12v", "cabin", "engine_temp", "drive_time", "odometer"]
 
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
