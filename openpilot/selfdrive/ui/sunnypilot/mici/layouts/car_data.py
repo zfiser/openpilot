@@ -121,6 +121,12 @@ def engine_text(item) -> str:
   return f"{engine}/{gearbox:.0f}°{item.unit}"
 
 
+def degrees_text(item) -> str:
+  """A temperature as 19.9°C, like the engine / gearbox tile."""
+  text = format_value(item.value, item.unit, item.valid)
+  return text[:-2] + "°" + item.unit if item.valid and item.unit in ("C", "F") else text
+
+
 def format_duration(seconds: float) -> str:
   """Seconds as hours:minutes, for example 1:25 and 0:07."""
   minutes = int(max(seconds, 0.0) // 60)
@@ -357,6 +363,8 @@ class _TileRow(Widget):
         text = today_text(item)
       elif item.key == "engine_temp":
         text = engine_text(item)
+      elif item.key == "cabin":
+        text = degrees_text(item)
       elif item.key in DURATION_KEYS:
         text = format_duration(item.value) if item.valid else "--"
       else:

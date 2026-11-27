@@ -264,6 +264,11 @@ class TestCarData(unittest.TestCase):
     from opendbc.sunnypilot.car.toyota.ecu_data import FOCUS_PATH
     assert self.mod.FOCUS_PATH == FOCUS_PATH
 
+  def test_cabin_degrees(self):
+    assert self.mod.degrees_text(_Obj(key="cabin", label="Cabin", value=19.9, unit="C", valid=True)) == "19.9°C"
+    assert self.mod.degrees_text(_Obj(key="cabin", label="Cabin", value=16.0, unit="C", valid=True)) == "16°C"
+    assert self.mod.degrees_text(_Obj(key="cabin", label="Cabin", value=0.0, unit="C", valid=False)) == "--"
+
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []
