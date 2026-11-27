@@ -33,7 +33,7 @@ class TestDemoData:
     for t in range(0, 600, 7):
       v = items(float(t))
       assert 40 <= v["diag_oil_temp"] <= 110 and 11.0 <= v["diag_12v_v"] <= 15.5
-      assert v["diag_compressor"] >= 0 and v["rpm"] >= 0
+      assert v["rpm"] >= 0
       assert 200 <= v["diag_tire_p_fl"] <= 300
 
   def test_closing_reaches_the_decimal_range(self):

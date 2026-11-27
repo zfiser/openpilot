@@ -27,7 +27,6 @@ DIAG_ITEMS = [("rpm", "Engine RPM", 1850.0, "rpm", True), ("engine_temp", "Engin
               ("diag_gen_inverter", "Generator inverter", 14.0, "C", True), ("diag_inverter_coolant", "Inverter coolant", 19.0, "C", True),
               ("diag_rear_inverter_coolant", "Rear inverter coolant", 12.0, "C", True), ("diag_boost_upper", "Boost upper", 17.0, "C", True),
               ("diag_boost_lower", "Boost lower", 17.0, "C", True), ("diag_cabin", "Cabin", 16.0, "C", True),
-              ("diag_compressor", "Compressor", 0.0, "rpm", True), ("diag_compressor_target", "Compressor target", 0.0, "rpm", True),
               ("diag_ac_power", "A/C power", 0.0, "kW", True), ("diag_12v_v", "12V", 14.48, "V", True),
               ("diag_12v_a", "12V current", 5.87, "A", True), ("diag_12v_temp", "12V temp", 11.9, "C", True),
               ("diag_12v_smooth", "12V smoothed", 14.14, "V", True), ("diag_12v_relay", "12V before relay", 11.29, "V", True),
@@ -185,12 +184,12 @@ def _wander(key: str, t: float, amplitude: float) -> float:
 
 WANDER = {"rpm": 700.0, "engine_temp": 6.0, "diag_oil_temp": 8.0, "diag_coolant": 6.0, "diag_transaxle_oil": 6.0,
           "diag_mg_inverter": 5.0, "diag_gen_inverter": 5.0, "diag_inverter_coolant": 4.0, "diag_rear_inverter_coolant": 3.0,
-          "diag_boost_upper": 4.0, "diag_boost_lower": 4.0, "diag_cabin": 1.5, "diag_compressor": 900.0,
-          "diag_compressor_target": 900.0, "diag_ac_power": 0.6, "diag_12v_v": 0.25, "diag_12v_a": 8.0, "diag_12v_temp": 1.0,
+          "diag_boost_upper": 4.0, "diag_boost_lower": 4.0, "diag_cabin": 1.5,
+          "diag_ac_power": 0.6, "diag_12v_v": 0.25, "diag_12v_a": 8.0, "diag_12v_temp": 1.0,
           "diag_12v_smooth": 0.15, "diag_12v_relay": 0.2, "diag_aux_v": 0.2}
 WARM = {"diag_oil_temp": 70.0, "diag_coolant": 70.0, "diag_transaxle_oil": 45.0, "diag_mg_inverter": 30.0, "diag_gen_inverter": 30.0,
         "diag_inverter_coolant": 25.0, "diag_rear_inverter_coolant": 20.0, "diag_boost_upper": 25.0, "diag_boost_lower": 25.0,
-        "engine_temp": 70.0, "diag_cabin": 5.0, "diag_compressor": 1500.0, "diag_compressor_target": 1500.0, "diag_ac_power": 0.8,
+        "engine_temp": 70.0, "diag_cabin": 5.0, "diag_ac_power": 0.8,
         "diag_tire_t_fl": 12.0, "diag_tire_t_fr": 12.0, "diag_tire_t_rl": 10.0, "diag_tire_t_rr": 10.0, "diag_hv_temp1": 10.0,
         "diag_hv_temp2": 10.0, "diag_hv_temp3": 10.0, "diag_hv_temp4": 10.0, "diag_hv_temp5": 10.0, "diag_hv_temp6": 10.0}
 
@@ -200,7 +199,7 @@ def demo_items(t: float) -> list:
   out = []
   for key, label, value, unit, valid in DIAG_ITEMS:
     v = value + WARM.get(key, 0.0) + _wander(key, t, WANDER.get(key, 1.0 if key.startswith("diag_") else 0.0))
-    if key.startswith(("diag_compressor", "diag_ac_power", "rpm")):
+    if key.startswith(("diag_ac_power", "rpm")):
       v = max(v, 0.0)
     if key == "odometer":
       v = value + t * 0.02

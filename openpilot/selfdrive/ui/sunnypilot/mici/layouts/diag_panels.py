@@ -78,13 +78,11 @@ def drivetrain_panel(items: dict):
 
 
 def climate_panel(items: dict):
-  keys = ("diag_cabin", "diag_compressor", "diag_compressor_target", "diag_ac_power")
+  keys = ("diag_cabin", "diag_ac_power")
   if not any(k in items for k in keys):
     return None
-  speed, target = _value(items, "diag_compressor"), _value(items, "diag_compressor_target")
   return SimpleNamespace(key="panel_climate", title="Climate", big="Cabin " + _fmt(_value(items, "diag_cabin"), "°C", 1), state=None,
-                         grid=None, pairs=[("Compressor", f"{_fmt(speed, '').strip() or '--'} / {_fmt(target, 'rpm')}"),
-                                           ("A/C power", _fmt(_value(items, "diag_ac_power"), "kW", 1))])
+                         grid=None, pairs=[("A/C power", _fmt(_value(items, "diag_ac_power"), "kW", 1))])
 
 
 PANELS = (battery_12v_panel, tyres_panel, hybrid_battery_panel, drivetrain_panel, climate_panel)
