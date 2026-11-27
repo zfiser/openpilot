@@ -248,6 +248,22 @@ class TestCarData(unittest.TestCase):
     tile = next(i for i in self.mod.merge_gearbox(items) if i.key == "engine_temp")
     assert self.mod.engine_text(tile) == "190°/212°F"
 
+  def test_touch_focus(self):
+    import os
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+      path = os.path.join(d, "focus")
+      self.mod.touch_focus(path)
+      assert os.path.exists(path)
+      os.utime(path, (1.0, 1.0))
+      self.mod.touch_focus(path)
+      assert os.stat(path).st_mtime > 1000.0
+      self.mod.touch_focus(os.path.join(d, "missing", "focus"))  # no directory: nothing raised
+
+  def test_focus_path_matches_the_reader(self):
+    from opendbc.sunnypilot.car.toyota.ecu_data import FOCUS_PATH
+    assert self.mod.FOCUS_PATH == FOCUS_PATH
+
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []

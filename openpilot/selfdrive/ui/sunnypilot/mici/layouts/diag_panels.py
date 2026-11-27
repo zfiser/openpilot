@@ -30,7 +30,7 @@ def _fmt(value, unit: str, decimals: int = 0) -> str:
 
 
 def battery_12v_panel(items: dict):
-  keys = ("diag_12v_v", "diag_12v_a", "diag_12v_temp", "diag_12v_smooth", "diag_12v_relay", "diag_aux_v", "diag_12v_km")
+  keys = ("diag_12v_v", "diag_12v_a", "diag_12v_temp", "diag_12v_smooth", "diag_12v_relay", "diag_aux_v")
   if not any(k in items for k in keys):
     return None
   volts, amps = _value(items, "diag_12v_v"), _value(items, "diag_12v_a")
@@ -40,8 +40,7 @@ def battery_12v_panel(items: dict):
                          pairs=[("Temperature", _fmt(_value(items, "diag_12v_temp"), "°C", 1)),
                                 ("Smoothed", _fmt(_value(items, "diag_12v_smooth"), "V", 2)),
                                 ("Hybrid ECU", _fmt(_value(items, "diag_aux_v"), "V", 2)),
-                                ("Before main relay", _fmt(_value(items, "diag_12v_relay"), "V", 2)),
-                                ("Disconnected", _fmt(_value(items, "diag_12v_km"), "km ago"))])
+                                ("Before main relay", _fmt(_value(items, "diag_12v_relay"), "V", 2))])
 
 
 def tyres_panel(items: dict):

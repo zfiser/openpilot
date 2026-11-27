@@ -30,7 +30,7 @@ DIAG_ITEMS = [("rpm", "Engine RPM", 1850.0, "rpm", True), ("engine_temp", "Engin
               ("diag_ac_power", "A/C power", 0.0, "kW", True), ("diag_12v_v", "12V", 14.48, "V", True),
               ("diag_12v_a", "12V current", 5.87, "A", True), ("diag_12v_temp", "12V temp", 11.9, "C", True),
               ("diag_12v_smooth", "12V smoothed", 14.14, "V", True), ("diag_12v_relay", "12V before relay", 11.29, "V", True),
-              ("diag_aux_v", "Aux", 14.38, "V", True), ("diag_12v_km", "Since disconnect", 3124.0, "km", True),
+              ("diag_aux_v", "Aux", 14.38, "V", True),
               *[(f"diag_hv_temp{i}", f"HV {i}", t, "C", True) for i, t in enumerate((15.35, 15.71, 15.05, 15.05, 15.76, 15.25), 1)],
               *[(f"diag_tire_p_{w}", w, p, "kPa", True) for w, p in (("fl", 253.4), ("fr", 250.0), ("rl", 251.7), ("rr", 253.4))],
               *[(f"diag_tire_t_{w}", w, t, "C", True) for w, t in (("fl", 13.0), ("fr", 13.0), ("rl", 14.0), ("rr", 13.0))]]

@@ -6,6 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 import datetime
 import json
+import os
 import time
 from types import SimpleNamespace
 
@@ -139,6 +140,20 @@ def order_items(items: list) -> list:
 
 def rows_of(items: list, columns: int = COLUMNS) -> list[list]:
   return [items[i:i + columns] for i in range(0, len(items), columns)]
+
+
+FOCUS_PATH = "/dev/shm/car_data_focus"  # touched while the tiles are on screen: the car process then reads the 12 V current and
+FOCUS_TOUCH = 1.0  # the transaxle oil once a second (opendbc sunnypilot/car/toyota/ecu_data.py); s between two touches
+
+
+def touch_focus(path: str = FOCUS_PATH) -> None:
+  """Sets the file's time to now (RAM, no storage write); never raises."""
+  try:
+    with open(path, "a"):
+      pass
+    os.utime(path)
+  except OSError:
+    pass
 
 
 LIVE_PATH = "/dev/shm/daily_odometer_live.json"  # the running values of the car process, in RAM (see daily_distance.py)
@@ -389,6 +404,7 @@ class MiciCarDataLayout(Scroller):
     self._has_items = False
     self._stored: list = []
     self._stored_time = -10.0
+    self._focus_time = -FOCUS_TOUCH
 
   def _stored_items(self) -> list:
     if time.monotonic() - self._stored_time > 2.0:
@@ -439,3 +455,8 @@ class MiciCarDataLayout(Scroller):
       self._empty.render(rect)
       return
     self._scroller.render(rect)
+    # the tiles are on screen: the page is in view (not mid-swipe away) and scrolled less than a tile row down
+    on_screen = abs(rect.x) < rect.width / 2 and self._scroller.scroll_panel.get_offset() > -self._tile_height
+    if on_screen and time.monotonic() - self._focus_time >= FOCUS_TOUCH:
+      self._focus_time = time.monotonic()
+      touch_focus()
