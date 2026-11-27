@@ -146,20 +146,20 @@ GREEN = rl.Color(70, 210, 110, 255)
 RED = rl.Color(255, 90, 90, 255)
 
 
-PAIR_SIZE = 24  # font size of the label / value lines of a panel (at the 240 px reference height)
-PAIR_LINE = 1.42  # line height in font sizes
-TWO_COLUMN_LABEL = 10  # characters: panels whose labels and values are all this short keep two columns (hybrid battery)
-TWO_COLUMN_VALUE = 8  # e.g. "15.4 °C"; the compressor's "1,500 / 1,500 rpm" needs a line of its own
+PAIR_SIZE = 30  # font size of the label / value lines of a panel (at the 240 px reference height); read in a moving car
+PAIR_LINE = 1.36  # line height in font sizes
+TITLE_SIZE, BIG_SIZE = 26, 40
+TYRE_NAME, TYRE_TEMP, TYRE_PRESSURE = 24, 40, 30  # the pressure goes under the temperature, both large
 
 
-def _columns(panel) -> int:
-  short = all(len(label) <= TWO_COLUMN_LABEL and len(value) <= TWO_COLUMN_VALUE for label, value in panel.pairs)
-  return 2 if short else 1
+def _text_width(font, text: str, size: float) -> float:
+  return measure_text_cached(font, text, int(size)).x
 
 
 class _PanelRow(Widget):
-  """One group of values read from the car's ECUs (diag_panels.py), a full screen of the page: a title, an optional big
-  line, then label / value pairs in two columns, or for the tyres a 2 x 2 grid laid out like the car."""
+  """One group of values read from the car's ECUs (diag_panels.py): a title, an optional big line, then label / value
+  lines (two columns where they fit, else one), or for the tyres a 2 x 2 grid laid out like the car. The panel is as tall
+  as its content (at least two tile rows); the page scrolls."""
 
   def __init__(self, width: float, height: float, pad: float, scale: float):
     super().__init__()
@@ -168,16 +168,36 @@ class _PanelRow(Widget):
     self._pad = pad
     self._scale = scale
     self._panel = None
+    self._columns = 1
     self._font = gui_app.font(FontWeight.MEDIUM)
     self._bold = gui_app.font(FontWeight.BOLD)
 
+  # geometry, shared by the height and the drawing
+  def _inner(self, width: float) -> tuple[float, float, float]:
+    """(left, width, right edge of values) of the content, relative to the row."""
+    pad = self._pad
+    left = pad + pad * 1.2
+    right = width - pad - pad * 2.0
+    return left, right - left, right
+
+  def _fits_two_columns(self, panel) -> bool:
+    s, gap = self._scale, self._pad * 1.5
+    _, inner_w, _ = self._inner(self._rect.width)
+    col_w = (inner_w - gap) / 2
+    size = PAIR_SIZE * s
+    need = max((_text_width(self._font, label, size) + _text_width(self._bold, value, size) + self._pad
+                for label, value in panel.pairs), default=0.0)
+    return need <= col_w
+
   def set_panel(self, panel) -> None:
     self._panel = panel
-    # the panel grows with its content (one column for long labels), at least the size of two tile rows
     s, pad = self._scale, self._pad
-    content = pad * 0.9 + 28 * s + (40 * s if panel.big else 0.0) + pad * 1.2
-    if panel.pairs and not panel.grid:
-      rows = len(panel.pairs) if _columns(panel) == 1 else (len(panel.pairs) + 1) // 2
+    self._columns = 2 if panel.pairs and self._fits_two_columns(panel) else 1
+    content = pad * 0.9 + TITLE_SIZE * 1.25 * s + (BIG_SIZE * 1.2 * s if panel.big else 0.0) + pad
+    if panel.grid:
+      content += 2 * (TYRE_NAME + TYRE_TEMP + TYRE_PRESSURE) * 1.12 * s
+    elif panel.pairs:
+      rows = (len(panel.pairs) + self._columns - 1) // self._columns
       content += rows * PAIR_SIZE * PAIR_LINE * s
     self.set_rect(rl.Rectangle(self._rect.x, self._rect.y, self._rect.width, max(self._min_height, content)))
 
@@ -194,29 +214,31 @@ class _PanelRow(Widget):
       return
     s, pad = self._scale, self._pad
     tile = rl.Rectangle(rect.x + pad, rect.y, rect.width - 2 * pad, rect.height)
-    rl.draw_rectangle_rounded(tile, 0.09, 8, TILE_COLOR)
-    x, y, w = tile.x + pad * 1.2, tile.y + pad * 0.9, tile.width - pad * 2.4
-    self._text(p.title, x, y, 22 * s, LABEL_COLOR)
-    y += 28 * s
+    rl.draw_rectangle_rounded(tile, 0.06, 8, TILE_COLOR)
+    left, inner_w, right = self._inner(rect.width)
+    x, y = rect.x + left, tile.y + pad * 0.9
+    right_edge = rect.x + right
+    self._text(p.title, x, y, TITLE_SIZE * s, LABEL_COLOR)
+    y += TITLE_SIZE * 1.25 * s
     if p.big:
       color = GREEN if p.state == "charging" else RED if p.state == "draining" else VALUE_COLOR
-      self._text(p.big, x, y, 32 * s, color, bold=True)
-      y += 40 * s
+      self._text(p.big, x, y, BIG_SIZE * s, color, bold=True)
+      y += BIG_SIZE * 1.2 * s
     if p.grid:
-      cell_w, cell_h = (w - pad) / 2, (tile.y + tile.height - y - pad * 0.6) / 2
+      cell_w = inner_w / 2
+      cell_h = (TYRE_NAME + TYRE_TEMP + TYRE_PRESSURE) * 1.12 * s
       for i, (name, pressure, temp) in enumerate(p.grid):
         cx, cy = x + (i % 2) * cell_w, y + (i // 2) * cell_h
-        # the temperature is the news (the dash shows the pressures): big and white, the pressure small beside it
-        self._text(name, cx, cy, 20 * s, LABEL_COLOR)
-        self._text(temp, cx, cy + 22 * s, 30 * s, VALUE_COLOR, bold=True)
-        self._text(pressure, cx + cell_w * 0.48, cy + 25 * s, 26 * s, LABEL_COLOR)
+        # the temperature is the news (the dash shows the pressures): big and white, the pressure under it
+        self._text(name, cx, cy, TYRE_NAME * s, LABEL_COLOR)
+        self._text(temp, cx, cy + TYRE_NAME * 1.1 * s, TYRE_TEMP * s, VALUE_COLOR, bold=True)
+        self._text(pressure, cx, cy + (TYRE_NAME + TYRE_TEMP) * 1.1 * s, TYRE_PRESSURE * s, LABEL_COLOR)
       return
     size = PAIR_SIZE * s
     line = size * PAIR_LINE
     gap = pad * 1.5  # between the two columns
-    right_edge = tile.x + tile.width - pad * 2.0  # values end here, clear of the rounded edge
-    columns = _columns(p)
-    col_w = (right_edge - x - gap * (columns - 1)) / columns
+    columns = self._columns
+    col_w = (inner_w - gap * (columns - 1)) / columns
     for i, (label, value) in enumerate(p.pairs):
       cx, cy = x + (i % columns) * (col_w + gap), y + (i // columns) * line
       self._text(label, cx, cy, size, LABEL_COLOR)
