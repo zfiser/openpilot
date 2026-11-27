@@ -24,7 +24,7 @@ ONE_DECIMAL_KEYS: set[str] = set()  # keys shown with one decimal place, none: t
 # The tiles that are always on the page, in this order (today and the 12 V battery are the first row). They show '--' while
 # there is no data, with the car off, without a lead car and so on, so the page keeps its layout.
 STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"), ("cabin", "Cabin", "C"),
-                  ("engine_temp", "Engine temp", "C"), ("drive_time", "Time", "s"), ("odometer", "Odometer", "km"))
+                  ("engine_temp", "Engine temp", "C"), ("odometer", "Odometer", "km"))  # the time of today is in "today"
 DURATION_KEYS = {"drive_time"}  # seconds, shown as h:mm
 HIDDEN_KEYS = {"lead_distance", "friction_brake_force", "radar_distance", "radar_rel_speed", "rpm"}  # driving screen / warnings only
 CABIN_SOURCE = "diag_cabin"  # the cabin tile shows the climate ECU's cabin temperature (read once a minute, ECU data)
@@ -64,6 +64,36 @@ def complete_items(items: list) -> list:
   missing = [SimpleNamespace(key=key, label=label, value=0.0, unit=unit, valid=False)
              for key, label, unit in STANDARD_TILES if key not in have]
   return [*items, *missing]
+
+
+def format_hours_minutes(seconds: float) -> str:
+  """Seconds as 1h42m, or 42m under an hour."""
+  minutes = int(max(seconds, 0.0) // 60)
+  return f"{minutes // 60}h{minutes % 60:02d}m" if minutes >= 60 else f"{minutes}m"
+
+
+def merge_today(items: list) -> list:
+  """The time driven today goes into the "today" tile (42 km/1h42m), the separate time item is dropped."""
+  time_item = next((i for i in items if i.key == "drive_time"), None)
+  if time_item is None:
+    return items
+  out = []
+  for i in items:
+    if i.key == "drive_time":
+      continue
+    if i.key == "today":
+      i = SimpleNamespace(key=i.key, label=i.label, value=i.value, unit=i.unit, valid=i.valid,
+                          seconds=time_item.value if time_item.valid else None)
+    out.append(i)
+  return out
+
+
+def today_text(item) -> str:
+  if not item.valid:
+    return "--"
+  distance = format_value(item.value, item.unit, True).replace(" ", "")
+  seconds = getattr(item, "seconds", None)
+  return distance if seconds is None else f"{distance}/{format_hours_minutes(seconds)}"
 
 
 def format_duration(seconds: float) -> str:
@@ -145,6 +175,8 @@ def get_items(sm) -> list:
 
 GREEN = rl.Color(70, 210, 110, 255)
 RED = rl.Color(255, 90, 90, 255)
+CHARGING_COLOR, DRAINING_COLOR = GREEN, RED
+AMPS_IDLE = 0.5  # A, a smaller 12 V current is shown white (neither charging nor draining), as on the 12 V battery panel
 
 
 PAIR_SIZE = 30  # font size of the label / value lines of a panel (at the 240 px reference height); read in a moving car
@@ -256,6 +288,7 @@ class _TileRow(Widget):
     self._pad = pad
     self._label_size = int(22 * scale)
     self._value_size = int(35 * scale)
+    self._value_font = gui_app.font(FontWeight.BOLD)
     self._cache = label_cache
     self._items: list = []
 
@@ -281,13 +314,32 @@ class _TileRow(Widget):
 
       label, value = self._labels(item.key)
       label.set_text(item.label)
-      if item.key in DURATION_KEYS:
-        value.set_text(format_duration(item.value) if item.valid else "--")
+      if item.key == "today":
+        text = today_text(item)
+      elif item.key in DURATION_KEYS:
+        text = format_duration(item.value) if item.valid else "--"
       else:
-        value.set_text(format_value(item.value, item.unit, item.valid, 1 if item.key in ONE_DECIMAL_KEYS else None))
+        text = format_value(item.value, item.unit, item.valid, 1 if item.key in ONE_DECIMAL_KEYS else None)
+      amps = getattr(item, "amps", None)  # the 12 V battery: the current after the voltage, green charging / red draining
+      amps_text = f"{abs(amps):.1f}A" if amps is not None and item.valid else None
+      gap = self._value_size * 0.3
+      text_w = tile.width - inner * 2
+      size = self._value_size  # a long value (a long day: 123km/10h05m) gets a smaller font rather than being cut
+      while size > self._value_size * 0.6 and self._width_of(text, amps_text, size, gap) > text_w:
+        size -= 1
+      value.set_text(text)
+      value.set_font_size(size)
       label.render(rl.Rectangle(tile.x + inner, tile.y + top, tile.width - inner * 2, label_h))
       value_y = tile.y + top + label_h
       value.render(rl.Rectangle(tile.x + inner, value_y, tile.width - inner * 2, tile.y + tile.height - value_y))
+      if amps_text is not None:
+        color = CHARGING_COLOR if amps > AMPS_IDLE else DRAINING_COLOR if amps < -AMPS_IDLE else VALUE_COLOR
+        x = tile.x + inner + measure_text_cached(self._value_font, text, size).x + gap
+        rl.draw_text_ex(self._value_font, amps_text, rl.Vector2(round(x), round(value_y)), size, 0, color)  # top, as the label
+
+  def _width_of(self, text: str, amps_text: str | None, size: int, gap: float) -> float:
+    w = measure_text_cached(self._value_font, text, size).x
+    return w + gap + measure_text_cached(self._value_font, amps_text, size).x if amps_text else w
 
 
 class MiciCarDataLayout(Scroller):
@@ -326,10 +378,14 @@ class MiciCarDataLayout(Scroller):
     if (battery := voltage_item(ui_state.sm)) is not None:
       items = [*items, battery]
     panels = build_panels(items)  # the values read from the ECUs, one full-screen panel per group after the tiles
+    amps = next((i for i in items if i.key == "diag_12v_a" and i.valid), None)
+    if amps is not None:  # the 12 V tile shows the battery current read from the hybrid ECU next to the voltage
+      items = [SimpleNamespace(key=i.key, label=i.label, value=i.value, unit=i.unit, valid=i.valid, amps=float(amps.value))
+               if i.key == "battery_12v" else i for i in items]
     cabin = next((i for i in items if i.key == CABIN_SOURCE), None)
     if cabin is not None:
       items = [*items, SimpleNamespace(key="cabin", label="Cabin", value=cabin.value, unit="C", valid=cabin.valid)]
-    items = order_items(complete_items([i for i in items if not i.key.startswith(DIAG_PREFIX)]))
+    items = order_items(complete_items(merge_today([i for i in items if not i.key.startswith(DIAG_PREFIX)])))
     self._has_items = bool(items)
 
     rows = rows_of(items)

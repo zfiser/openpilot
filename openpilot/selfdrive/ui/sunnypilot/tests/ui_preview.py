@@ -28,10 +28,10 @@ from openpilot.selfdrive.ui.sunnypilot.demo_data import DIAG_ITEMS, ROAD, animat
 # name -> (lead car, planner stop, openpilot state enabled, car data items as (key, label, value, unit, valid))
 SCENARIOS = {
   rl.KeyboardKey.KEY_ONE: ("engaged, no lead", False, False, True, [("odometer", "Odometer", 54321.0, "km", True),
-                                                                       ("today", "Today", 42.0, "km", True),
+                                                                       ("today", "Today", 42.0, "km", True), ("drive_time", "Time", 6120.0, "s", True),
                                                                        ("rpm", "Engine RPM", 1800.0, "rpm", True)]),
   rl.KeyboardKey.KEY_TWO: ("lead car", True, False, True, [("odometer", "Odometer", 54321.0, "km", True),
-                                                           ("today", "Today", 42.0, "km", True),
+                                                           ("today", "Today", 42.0, "km", True), ("drive_time", "Time", 6120.0, "s", True),
                                                            ("rpm", "Engine RPM", 1800.0, "rpm", True),
                                                            ("engine_temp", "Engine temp", 82.0, "C", True),
                                                            ("lead_distance", "Lead distance", 23.0, "m", True),
@@ -41,7 +41,7 @@ SCENARIOS = {
   rl.KeyboardKey.KEY_FOUR: ("disengaged, car data missing", False, False, False, [("odometer", "Odometer", 0.0, "km", False),
                                                                                  ("rpm", "Engine RPM", 0.0, "rpm", False)]),
   rl.KeyboardKey.KEY_FIVE: ("many items", True, False, True, [
-    ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True),
+    ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True), ("drive_time", "Time", 6120.0, "s", True),
     ("rpm", "Engine RPM", 1800.0, "rpm", True),
     ("tire_pressure_guess", "Tire pressure?", 264.0, "kPa", True), ("tire_temperature_guess", "Tire temp?", 25.0, "C", True),
     ("hv", "Hybrid battery", 62.0, "%", True)]),

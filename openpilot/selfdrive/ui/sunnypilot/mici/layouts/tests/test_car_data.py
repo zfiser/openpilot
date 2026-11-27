@@ -204,7 +204,28 @@ class TestCarData(unittest.TestCase):
 
   def test_time_tile_comes_after_the_engine_temperature(self):
     keys = ["odometer", "drive_time", "engine_temp", "cabin", "battery_12v", "today"]
-    assert [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])] ==       ["today", "battery_12v", "cabin", "engine_temp", "drive_time", "odometer"]
+    assert [i.key for i in self.mod.order_items([_Obj(key=k) for k in keys])] == \
+      ["today", "battery_12v", "cabin", "engine_temp", "drive_time", "odometer"]
+
+  def test_hours_minutes(self):
+    assert self.mod.format_hours_minutes(0) == "0m"
+    assert self.mod.format_hours_minutes(42 * 60 + 59) == "42m"
+    assert self.mod.format_hours_minutes(102 * 60) == "1h42m"
+    assert self.mod.format_hours_minutes(10 * 3600 + 5 * 60) == "10h05m"
+    assert self.mod.format_hours_minutes(-5) == "0m"
+
+  def test_time_goes_into_the_today_tile(self):
+    items = [_Obj(key="today", label="Today", value=42.0, unit="km", valid=True),
+             _Obj(key="drive_time", label="Time", value=102 * 60.0, unit="s", valid=True), _Obj(key="odometer")]
+    merged = self.mod.merge_today(items)
+    assert [i.key for i in merged] == ["today", "odometer"]
+    assert self.mod.today_text(merged[0]) == "42km/1h42m"
+
+  def test_today_without_time(self):
+    today = _Obj(key="today", label="Today", value=42.0, unit="km", valid=True)
+    assert self.mod.merge_today([today]) == [today]
+    assert self.mod.today_text(today) == "42km"
+    assert self.mod.today_text(_Obj(key="today", label="Today", value=0.0, unit="km", valid=False)) == "--"
 
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]

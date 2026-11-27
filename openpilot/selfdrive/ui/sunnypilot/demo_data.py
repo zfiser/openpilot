@@ -21,7 +21,7 @@ ROAD = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "
 
 # the values read from the ECUs (diag_*), as answered by the car on 24 Nov (analysis 2026-11-23_diag, probe 1 and 2)
 DIAG_ITEMS = [("rpm", "Engine RPM", 1850.0, "rpm", True), ("engine_temp", "Engine temp", 17.0, "C", True),
-              ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True),
+              ("odometer", "Odometer", 54321.0, "km", True), ("today", "Today", 42.0, "km", True), ("drive_time", "Time", 6120.0, "s", True),
               ("diag_oil_temp", "Oil", 18.0, "C", True), ("diag_coolant", "Coolant", 17.5, "C", True),
               ("diag_transaxle_oil", "Transaxle oil", 17.0, "C", True), ("diag_mg_inverter", "Motor inverter", 15.0, "C", True),
               ("diag_gen_inverter", "Generator inverter", 14.0, "C", True), ("diag_inverter_coolant", "Inverter coolant", 19.0, "C", True),
