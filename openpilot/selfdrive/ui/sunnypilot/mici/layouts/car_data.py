@@ -99,7 +99,7 @@ def today_text(item) -> str:
 
 
 def merge_gearbox(items: list) -> list:
-  """The transaxle oil temperature goes into the engine temperature tile (89/72 C)."""
+  """The transaxle oil temperature goes into the engine temperature tile (89°/72°C)."""
   gearbox = next((i for i in items if i.key == GEARBOX_SOURCE and i.valid), None)
   if gearbox is None:
     return items
@@ -112,12 +112,12 @@ def merge_gearbox(items: list) -> list:
 
 
 def engine_text(item) -> str:
-  """89/72 C with the gearbox, else the engine alone; '--' for a value the car did not give."""
+  """89°/72°C with the gearbox, else the engine alone; '--' for a value the car did not give."""
   gearbox = getattr(item, "gearbox", None)
   if gearbox is None:
     return format_value(item.value, item.unit, item.valid)
-  engine = f"{item.value:.0f}" if item.valid else "--"
-  return f"{engine}/{gearbox:.0f} {item.unit}"
+  engine = f"{item.value:.0f}°" if item.valid else "--"
+  return f"{engine}/{gearbox:.0f}°{item.unit}"
 
 
 def format_duration(seconds: float) -> str:
