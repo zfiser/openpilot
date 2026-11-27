@@ -227,6 +227,27 @@ class TestCarData(unittest.TestCase):
     assert self.mod.today_text(today) == "42km"
     assert self.mod.today_text(_Obj(key="today", label="Today", value=0.0, unit="km", valid=False)) == "--"
 
+  def test_gearbox_goes_into_the_engine_tile(self):
+    items = [_Obj(key="engine_temp", label="Engine temp", value=89.1, unit="C", valid=True),
+             _Obj(key="diag_transaxle_oil", label="Transaxle oil", value=72.4, unit="C", valid=True)]
+    tile = next(i for i in self.mod.merge_gearbox(items) if i.key == "engine_temp")
+    assert tile.label == "Engine / gearbox" and self.mod.engine_text(tile) == "89/72 C"
+
+  def test_gearbox_without_engine_and_engine_without_gearbox(self):
+    gearbox = _Obj(key="diag_transaxle_oil", label="Transaxle oil", value=72.0, unit="C", valid=True)
+    tile = next(i for i in self.mod.merge_gearbox([gearbox]) if i.key == "engine_temp")
+    assert self.mod.engine_text(tile) == "--/72 C"
+    engine = _Obj(key="engine_temp", label="Engine temp", value=89.1, unit="C", valid=True)
+    stale = _Obj(key="diag_transaxle_oil", label="Transaxle oil", value=72.0, unit="C", valid=False)
+    assert self.mod.merge_gearbox([engine, stale]) == [engine, stale]
+    assert self.mod.engine_text(engine) == "89.1 C"
+
+  def test_gearbox_in_fahrenheit(self):
+    items = [_Obj(key="engine_temp", label="Engine temp", value=190.0, unit="F", valid=True),
+             _Obj(key="diag_transaxle_oil", label="Transaxle oil", value=100.0, unit="C", valid=True)]
+    tile = next(i for i in self.mod.merge_gearbox(items) if i.key == "engine_temp")
+    assert self.mod.engine_text(tile) == "190/212 F"
+
   def test_rows_of(self):
     assert self.mod.rows_of([1, 2, 3, 4, 5]) == [[1, 2], [3, 4], [5]]
     assert self.mod.rows_of([]) == []

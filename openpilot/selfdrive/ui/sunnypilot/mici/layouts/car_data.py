@@ -27,6 +27,8 @@ STANDARD_TILES = (("today", "Today", "km"), ("battery_12v", "12V battery", "V"),
                   ("engine_temp", "Engine temp", "C"), ("odometer", "Odometer", "km"))  # the time of today is in "today"
 DURATION_KEYS = {"drive_time"}  # seconds, shown as h:mm
 HIDDEN_KEYS = {"lead_distance", "friction_brake_force", "radar_distance", "radar_rel_speed", "rpm"}  # driving screen / warnings only
+GEARBOX_SOURCE = "diag_transaxle_oil"  # shown after the engine temperature: 89/72 C (read once a minute, ECU data)
+GEARBOX_LABEL = "Engine / gearbox"
 CABIN_SOURCE = "diag_cabin"  # the cabin tile shows the climate ECU's cabin temperature (read once a minute, ECU data)
 LAST_USEFUL_KEY = "odometer"  # after everything else that is useful, before the experimental tiles
 EXPERIMENTAL_PREFIXES = ("watch_", "tire_")  # RawCanWatch tiles and tire guesses, always after the useful tiles
@@ -94,6 +96,28 @@ def today_text(item) -> str:
   distance = format_value(item.value, item.unit, True).replace(" ", "")
   seconds = getattr(item, "seconds", None)
   return distance if seconds is None else f"{distance}/{format_hours_minutes(seconds)}"
+
+
+def merge_gearbox(items: list) -> list:
+  """The transaxle oil temperature goes into the engine temperature tile (89/72 C)."""
+  gearbox = next((i for i in items if i.key == GEARBOX_SOURCE and i.valid), None)
+  if gearbox is None:
+    return items
+  engine = next((i for i in items if i.key == "engine_temp"), None)
+  unit = engine.unit if engine is not None else "C"
+  celsius = float(gearbox.value)
+  tile = SimpleNamespace(key="engine_temp", label=GEARBOX_LABEL, value=engine.value if engine is not None else 0.0, unit=unit,
+                         valid=engine is not None and engine.valid, gearbox=celsius * 9 / 5 + 32 if unit == "F" else celsius)
+  return [*(i for i in items if i.key != "engine_temp"), tile]
+
+
+def engine_text(item) -> str:
+  """89/72 C with the gearbox, else the engine alone; '--' for a value the car did not give."""
+  gearbox = getattr(item, "gearbox", None)
+  if gearbox is None:
+    return format_value(item.value, item.unit, item.valid)
+  engine = f"{item.value:.0f}" if item.valid else "--"
+  return f"{engine}/{gearbox:.0f} {item.unit}"
 
 
 def format_duration(seconds: float) -> str:
@@ -316,6 +340,8 @@ class _TileRow(Widget):
       label.set_text(item.label)
       if item.key == "today":
         text = today_text(item)
+      elif item.key == "engine_temp":
+        text = engine_text(item)
       elif item.key in DURATION_KEYS:
         text = format_duration(item.value) if item.valid else "--"
       else:
@@ -385,6 +411,7 @@ class MiciCarDataLayout(Scroller):
     cabin = next((i for i in items if i.key == CABIN_SOURCE), None)
     if cabin is not None:
       items = [*items, SimpleNamespace(key="cabin", label="Cabin", value=cabin.value, unit="C", valid=cabin.valid)]
+    items = merge_gearbox(items)
     items = order_items(complete_items(merge_today([i for i in items if not i.key.startswith(DIAG_PREFIX)])))
     self._has_items = bool(items)
 
